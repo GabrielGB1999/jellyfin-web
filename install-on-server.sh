@@ -17,7 +17,8 @@
 set -euo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/GabrielGB1999/jellyfin-web.git}"
-# Branch to build for each server major version
+# Branch to build for each server version
+BRANCH_10_11="pdf-reader-10.11.z"
 BRANCH_12="pdf-reader-12.z"
 BRANCH_13="ccr-8cd7234d-pogewb"
 
@@ -84,14 +85,14 @@ server_version() {
     dpkg-query -W -f='${Version}' jellyfin-server
 }
 
-# Picks the branch whose jellyfin-web version matches the server major version
+# Picks the branch whose jellyfin-web version matches the server version
 pick_branch() {
     local version="$1"
-    local major="${version%%.*}"
 
-    case "$major" in
-        12) echo "$BRANCH_12" ;;
-        13) echo "$BRANCH_13" ;;
+    case "$version" in
+        10.11.*) echo "$BRANCH_10_11" ;;
+        12.*) echo "$BRANCH_12" ;;
+        13.*) echo "$BRANCH_13" ;;
         *) die "No branch is known for jellyfin-server $version. Pass one with --branch." ;;
     esac
 }
