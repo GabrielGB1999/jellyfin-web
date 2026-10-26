@@ -1,24 +1,91 @@
-#container {
-    position: relative;
-    display: grid;
-    place-items: center;
-    /* stylelint-disable-next-line declaration-block-no-duplicate-properties */
-    height: 100%;
-    top: env(safe-area-inset-top);
-    height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
-}
-
 #pdfPlayer {
     position: relative;
     height: 100%;
     width: 100%;
     overflow: hidden;
     z-index: 100;
-    background: #fff;
+    background: #525659;
 
-    #canvas {
+    #container {
+        position: absolute;
+        inset: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+        display: flex;
+        overflow: auto;
+        overscroll-behavior: contain;
+
+        &.pdfDragging {
+            cursor: grabbing;
+            user-select: none;
+        }
+    }
+
+    .pdfPages {
         position: relative;
-        display: block;
+        display: flex;
+        flex-shrink: 0;
+        align-items: center;
+        gap: 16px;
+        // margin auto centers the pages without clipping them when they overflow
         margin: auto;
+        padding: 16px;
+    }
+
+    .pdfPages-continuous {
+        flex-direction: column;
+    }
+
+    .pdfPage {
+        position: relative;
+        flex-shrink: 0;
+        background: #fff;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+    }
+}
+
+.pdfPageSlider {
+    flex: 1;
+    margin: 0 1em 0 0.5em;
+}
+
+.pdfPageLabel {
+    min-width: 5em;
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.pdfZoomLabel {
+    min-width: 3.5em;
+    padding: 0.4em 0.2em;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    font-variant-numeric: tabular-nums;
+}
+
+.pdfToolbarDivider {
+    width: 1px;
+    align-self: stretch;
+    margin: 0.8em 0.4em;
+    background: currentColor;
+    opacity: 0.3;
+}
+
+.pdfViewModeActive {
+    color: var(--jf-palette-primary-main, #00a4dc);
+}
+
+@media (max-width: 40em) {
+    .pdfZoomLabel,
+    .pdfToolbarDivider {
+        display: none;
     }
 }
