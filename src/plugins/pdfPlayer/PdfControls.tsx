@@ -64,6 +64,10 @@ export const PdfPageSlider: FC<PdfControlsProps> = ({ player }) => {
         player.seek(newValue as number);
     }, [player]);
 
+    const formatValueLabel = useCallback((v: number) => (
+        globalize.translate('PageNumberOfTotal', v, numPages)
+    ), [numPages]);
+
     const current = value ?? page;
 
     return (
@@ -77,12 +81,33 @@ export const PdfPageSlider: FC<PdfControlsProps> = ({ player }) => {
                 value={current}
                 disabled={numPages <= 1}
                 valueLabelDisplay='auto'
-                valueLabelFormat={v => globalize.translate('PageNumberOfTotal', v, numPages)}
+                valueLabelFormat={formatValueLabel}
                 onChange={onChange}
                 onChangeCommitted={onChangeCommitted}
             />
             <span className='pdfPageLabel'>{current} / {numPages}</span>
         </>
+    );
+};
+
+interface ViewModeButtonProps {
+    player: PdfControlsPlayer;
+    mode: PdfViewMode;
+    icon: string;
+    title: string;
+    active: boolean;
+}
+
+const ViewModeButton: FC<ViewModeButtonProps> = ({ player, mode, icon, title, active }) => {
+    const onClick = useCallback(() => player.setViewMode(mode), [player, mode]);
+
+    return (
+        <IconButton
+            className={active ? 'pdfViewModeActive' : undefined}
+            onClick={onClick}
+            icon={icon}
+            title={globalize.translate(title)}
+        />
     );
 };
 
@@ -106,12 +131,13 @@ export const PdfToolbar: FC<PdfControlsProps> = ({ player }) => {
             <div className='pdfToolbarDivider' />
 
             {VIEW_MODES.map(({ mode, icon, title }) => (
-                <IconButton
+                <ViewModeButton
                     key={mode}
-                    className={mode === viewMode ? 'pdfViewModeActive' : undefined}
-                    onClick={() => player.setViewMode(mode)}
+                    player={player}
+                    mode={mode}
                     icon={icon}
-                    title={globalize.translate(title)}
+                    title={title}
+                    active={mode === viewMode}
                 />
             ))}
         </>
