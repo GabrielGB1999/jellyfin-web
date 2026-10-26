@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 #
-# Builds this jellyfin-web fork and makes an apt-installed Jellyfin server use it.
+# Builds this jellyfin-web checkout and makes an apt-installed Jellyfin server use it.
 #
 # The server package is left untouched: the built web client is installed to a
-# separate directory and the server is pointed at it through JELLYFIN_WEB_DIR in
-# /etc/default/jellyfin, so apt upgrades do not overwrite it.
+# separate directory and a systemd drop-in mounts it over the packaged web client
+# for the jellyfin service only. This works however the package passes the web
+# directory to the server, and apt upgrades do not undo it.
 #
-# Usage:
-#   ./install-on-server.sh              build and install the branch matching the server version
+# Usage, from your clone of this repository:
+#   ./install-on-server.sh              build this checkout and install it
 #   ./install-on-server.sh --uninstall  switch back to the stock web client from the package
 #   ./install-on-server.sh --help       show all options
 #
-# Can be run straight from GitHub:
-#   curl -fsSL https://raw.githubusercontent.com/GabrielGB1999/jellyfin-web/ccr-8cd7234d-pogewb/install-on-server.sh | bash
+# Run it as your normal user, it asks for sudo when it needs it.
 
 set -euo pipefail
 
@@ -22,16 +22,26 @@ BRANCH_10_11="pdf-reader-10.11.z"
 BRANCH_12="pdf-reader-12.z"
 BRANCH_13="ccr-8cd7234d-pogewb"
 
-INSTALL_DIR="${INSTALL_DIR:-/opt/jellyfin-web-custom}"
-BUILD_DIR="${BUILD_DIR:-$HOME/.cache/jellyfin-web-build}"
+DEFAULT_INSTALL_DIR="/opt/jellyfin-web-custom"
+INSTALL_DIR="${INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
+# Only used when the script is not run from a checkout of this repository
+CLONE_DIR="${CLONE_DIR:-$HOME/.cache/jellyfin-web-build}"
 DEFAULTS_FILE="${DEFAULTS_FILE:-/etc/default/jellyfin}"
-STOCK_WEB_DIR="/usr/share/jellyfin/web"
+DROPIN_DIR="${DROPIN_DIR:-/etc/systemd/system/jellyfin.service.d}"
+DROPIN_FILE="$DROPIN_DIR/custom-web.conf"
+JELLYFIN_CONFIG_DIR="${JELLYFIN_CONFIG_DIR:-/etc/jellyfin}"
+FALLBACK_WEB_DIR="/usr/share/jellyfin/web"
 SERVICE="jellyfin"
 NVM_VERSION="v0.40.1"
+# File that only exists in checkouts containing the new PDF reader
+READER_MARKER="src/plugins/pdfPlayer/PdfControls.tsx"
 
 BRANCH=""
 UNINSTALL=0
 SKIP_RESTART=0
+SKIP_UPDATE=0
+REPO_DIR=""
+RESTART_TIME=""
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 warn() { printf '\033[1;33mWarning:\033[0m %s\n' "$*" >&2; }
@@ -41,12 +51,15 @@ usage() {
     cat <<EOF
 Usage: install-on-server.sh [options]
 
+Builds the jellyfin-web checkout the script is run from (or the current directory)
+and makes the apt-installed Jellyfin server use it.
+
 Options:
-  --branch NAME     Build this branch instead of picking one from the server version
+  --branch NAME     Build this branch instead of the one matching the server version
+  --no-update       Build the checkout as it is, without switching branch or pulling
   --install-dir DIR Where the built web client is installed (default: $INSTALL_DIR)
-  --build-dir DIR   Where the repository is cloned and built (default: $BUILD_DIR)
   --no-restart      Do not restart the jellyfin service
-  --uninstall       Point the server back at the stock web client ($STOCK_WEB_DIR)
+  --uninstall       Switch back to the stock web client from the jellyfin-web package
   -h, --help        Show this help
 EOF
 }
@@ -55,8 +68,8 @@ parse_args() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --branch) BRANCH="${2:?--branch needs a value}"; shift 2 ;;
+            --no-update) SKIP_UPDATE=1; shift ;;
             --install-dir) INSTALL_DIR="${2:?--install-dir needs a value}"; shift 2 ;;
-            --build-dir) BUILD_DIR="${2:?--build-dir needs a value}"; shift 2 ;;
             --no-restart) SKIP_RESTART=1; shift ;;
             --uninstall) UNINSTALL=1; shift ;;
             -h|--help) usage; exit 0 ;;
@@ -74,6 +87,13 @@ as_root() {
     fi
 }
 
+check_user() {
+    # Building with sudo would leave root owned files in the checkout
+    if [[ $EUID -eq 0 && -n "${SUDO_USER:-}" && "${SUDO_USER}" != root ]]; then
+        die "Run this script as $SUDO_USER without sudo, it asks for sudo itself when needed."
+    fi
+}
+
 check_server_installed() {
     command -v dpkg-query >/dev/null || die "dpkg-query not found, this script supports Debian/Ubuntu apt installs only."
     dpkg-query -W -f='${Status}' jellyfin-server 2>/dev/null | grep -q 'install ok installed' \
@@ -83,6 +103,14 @@ check_server_installed() {
 
 server_version() {
     dpkg-query -W -f='${Version}' jellyfin-server
+}
+
+# Prints "major.minor" of a version string
+major_minor() {
+    local version="$1"
+    local major="${version%%.*}"
+    local rest="${version#*.}"
+    echo "$major.${rest%%[.+~-]*}"
 }
 
 # Picks the branch whose jellyfin-web version matches the server version
@@ -95,6 +123,17 @@ pick_branch() {
         13.*) echo "$BRANCH_13" ;;
         *) die "No branch is known for jellyfin-server $version. Pass one with --branch." ;;
     esac
+}
+
+# The directory the jellyfin-web package installed the stock web client to
+stock_web_dir() {
+    local index
+    index=$(dpkg-query -L jellyfin-web 2>/dev/null | grep -m 1 '/index\.html$' || true)
+    if [[ -n "$index" ]]; then
+        dirname "$index"
+    else
+        echo "$FALLBACK_WEB_DIR"
+    fi
 }
 
 install_packages() {
@@ -111,27 +150,96 @@ install_packages() {
     fi
 }
 
-checkout_repo() {
-    local branch="$1"
+is_web_checkout() {
+    [[ -f "$1/package.json" && -e "$1/.git" ]] && grep -q '"name": *"jellyfin-web"' "$1/package.json"
+}
 
-    if [[ -d "$BUILD_DIR/.git" ]]; then
-        log "Updating $BUILD_DIR to $branch"
-        git -C "$BUILD_DIR" remote set-url origin "$REPO_URL"
-        git -C "$BUILD_DIR" fetch --depth 1 origin "$branch"
-        git -C "$BUILD_DIR" checkout -q -B "$branch" FETCH_HEAD
-        git -C "$BUILD_DIR" reset -q --hard FETCH_HEAD
-        git -C "$BUILD_DIR" clean -q -fdx -e node_modules
-    else
-        log "Cloning $REPO_URL ($branch) into $BUILD_DIR"
-        mkdir -p "$(dirname "$BUILD_DIR")"
-        git clone --depth 1 --branch "$branch" "$REPO_URL" "$BUILD_DIR"
+# Uses the checkout containing this script or the current directory, and only clones
+# when neither is a jellyfin-web checkout (e.g. when the script is piped from curl)
+find_repo() {
+    local script_dir=""
+    if [[ -n "${BASH_SOURCE[0]:-}" && -f "${BASH_SOURCE[0]}" ]]; then
+        script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
     fi
+
+    if [[ -n "$script_dir" ]] && is_web_checkout "$script_dir"; then
+        REPO_DIR="$script_dir"
+    elif is_web_checkout "$PWD"; then
+        REPO_DIR="$PWD"
+    elif [[ -d "$CLONE_DIR/.git" ]]; then
+        REPO_DIR="$CLONE_DIR"
+    else
+        log "No jellyfin-web checkout found here, cloning $REPO_URL into $CLONE_DIR"
+        mkdir -p "$(dirname "$CLONE_DIR")"
+        git clone "$REPO_URL" "$CLONE_DIR"
+        REPO_DIR="$CLONE_DIR"
+    fi
+
+    log "Using the checkout in $REPO_DIR"
+}
+
+repo_git() {
+    git -C "$REPO_DIR" "$@"
+}
+
+# Switches the checkout to the wanted branch and pulls it, never touching local changes
+prepare_repo() {
+    local branch="$1"
+    local current
+    current=$(repo_git rev-parse --abbrev-ref HEAD)
+
+    if [[ $SKIP_UPDATE -eq 1 ]]; then
+        log "Building $current as it is (--no-update)"
+        return
+    fi
+
+    if [[ -n "$(repo_git status --porcelain --untracked-files=no)" ]]; then
+        if [[ "$current" != "$branch" ]]; then
+            die "The checkout is on $current with uncommitted changes, but this server needs $branch. Commit or stash them, or rerun with --no-update to build $current anyway."
+        fi
+        warn "The checkout has uncommitted changes, building them without pulling."
+        return
+    fi
+
+    if [[ "$current" != "$branch" ]]; then
+        log "Switching the checkout from $current to $branch"
+        # single-branch clones (e.g. git clone --depth 1) only track their default branch
+        if ! repo_git config --get-all remote.origin.fetch | grep -q 'refs/heads/\*'; then
+            repo_git remote set-branches --add origin "$branch"
+        fi
+        repo_git fetch origin "$branch" \
+            || die "Could not fetch $branch from $(repo_git remote get-url origin)."
+        if repo_git show-ref --verify --quiet "refs/heads/$branch"; then
+            repo_git checkout -q "$branch"
+        else
+            repo_git checkout -q -b "$branch" --track "origin/$branch"
+        fi
+    fi
+
+    if repo_git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' >/dev/null 2>&1; then
+        log "Pulling the latest $branch"
+        repo_git pull -q --ff-only || warn "Could not fast-forward $branch, building the local version."
+    fi
+}
+
+check_checkout() {
+    local version="$1"
+    local web_version
+
+    [[ -f "$REPO_DIR/$READER_MARKER" ]] \
+        || die "The checked out branch ($(repo_git rev-parse --abbrev-ref HEAD)) does not contain the new PDF reader."
+
+    web_version=$(sed -n 's/^ *"version": *"\([^"]*\)".*/\1/p' "$REPO_DIR/package.json" | head -n 1)
+    if [[ "$(major_minor "$web_version")" != "$(major_minor "$version")" ]]; then
+        die "The checkout is jellyfin-web $web_version but the server is $version, they must match. Run without --no-update or pass the right --branch."
+    fi
+    log "Building jellyfin-web $web_version for jellyfin-server $version"
 }
 
 # Prints the minimum Node.js major version from the engines field of package.json
 required_node_major() {
     local engine
-    engine=$(sed -n 's/.*"node": *"[^0-9]*\([0-9][0-9]*\).*/\1/p' "$BUILD_DIR/package.json" | head -n 1)
+    engine=$(sed -n 's/.*"node": *"[^0-9]*\([0-9][0-9]*\).*/\1/p' "$REPO_DIR/package.json" | head -n 1)
     echo "${engine:-20}"
 }
 
@@ -171,99 +279,149 @@ ensure_node() {
 
 build_web() {
     log "Installing dependencies (this can take a few minutes)"
-    (cd "$BUILD_DIR" && npm ci --no-audit --no-fund)
+    (cd "$REPO_DIR" && npm ci --no-audit --no-fund)
 
     log "Building the web client"
-    (cd "$BUILD_DIR" && npm run build:production)
+    (cd "$REPO_DIR" && npm run build:production)
 
-    [[ -f "$BUILD_DIR/dist/index.html" ]] || die "The build did not produce dist/index.html."
+    [[ -f "$REPO_DIR/dist/index.html" ]] || die "The build did not produce dist/index.html."
 }
 
 install_web() {
     log "Installing the web client to $INSTALL_DIR"
     as_root mkdir -p "$INSTALL_DIR"
-    as_root rsync -a --delete "$BUILD_DIR/dist/" "$INSTALL_DIR/"
+    as_root rsync -a --delete "$REPO_DIR/dist/" "$INSTALL_DIR/"
     as_root chmod -R a+rX "$INSTALL_DIR"
 }
 
-# Sets KEY="VALUE" in the defaults file, replacing an existing (possibly commented out) line
-set_default() {
-    local key="$1"
-    local value="$2"
+# Undoes the /etc/default/jellyfin change made by earlier versions of this script
+restore_defaults_file() {
+    local stock="$1"
     local file="$DEFAULTS_FILE"
+    local key
 
-    if as_root grep -qE "^[[:space:]]*#?[[:space:]]*${key}=" "$file"; then
-        as_root sed -i -E "0,/^[[:space:]]*#?[[:space:]]*${key}=.*/s||${key}=\"${value}\"|" "$file"
-    else
-        printf '%s="%s"\n' "$key" "$value" | as_root tee -a "$file" >/dev/null
+    [[ -f "$file" ]] || return 0
+
+    for key in JELLYFIN_WEB_DIR JELLYFIN_WEB_OPT; do
+        if as_root grep -qE "^${key}=.*(${INSTALL_DIR}|${DEFAULT_INSTALL_DIR})" "$file"; then
+            log "Restoring $key in $file"
+            if [[ $key == JELLYFIN_WEB_DIR ]]; then
+                as_root sed -i -E "s|^${key}=.*|${key}=\"${stock}\"|" "$file"
+            else
+                as_root sed -i -E "s|^${key}=.*|${key}=\"--webdir=${stock}\"|" "$file"
+            fi
+        fi
+    done
+}
+
+# Mounts the custom web client over the stock one for the jellyfin service only
+configure_service() {
+    local stock="$1"
+
+    log "Mounting $INSTALL_DIR over $stock for the $SERVICE service"
+    as_root mkdir -p "$DROPIN_DIR"
+    printf '%s\n' \
+        '# Added by install-on-server.sh from jellyfin-web, remove this file to use the stock web client' \
+        '[Service]' \
+        "BindReadOnlyPaths=$INSTALL_DIR:$stock" \
+        | as_root tee "$DROPIN_FILE" >/dev/null
+    as_root systemctl daemon-reload
+}
+
+unconfigure_service() {
+    if [[ -f "$DROPIN_FILE" ]]; then
+        log "Removing $DROPIN_FILE"
+        as_root rm -f "$DROPIN_FILE"
+        as_root systemctl daemon-reload
     fi
 }
 
-configure_web_dir() {
-    local web_dir="$1"
-    local file="$DEFAULTS_FILE"
-
-    if [[ ! -f "$file" ]]; then
-        log "Creating $file"
-        as_root touch "$file"
-    elif [[ ! -f "$file.before-custom-web" ]]; then
-        log "Backing up $file to $file.before-custom-web"
-        as_root cp -p "$file" "$file.before-custom-web"
-    fi
-
-    log "Pointing the server at $web_dir"
-    set_default JELLYFIN_WEB_DIR "$web_dir"
-
-    # Older packages pass the web directory as a command line option, which takes precedence
-    if as_root grep -qE '^[[:space:]]*JELLYFIN_WEB_OPT=' "$file"; then
-        set_default JELLYFIN_WEB_OPT "--webdir=$web_dir"
-    fi
+# Reads a value like <InternalHttpPort>8096</InternalHttpPort> from network.xml
+network_setting() {
+    local name="$1"
+    local default="$2"
+    local value
+    value=$(as_root cat "$JELLYFIN_CONFIG_DIR/network.xml" 2>/dev/null \
+        | sed -n "s|.*<$name>\(.*\)</$name>.*|\1|p" | head -n 1 || true)
+    echo "${value:-$default}"
 }
 
-check_service_config() {
-    local unit
-    unit=$(systemctl cat "$SERVICE" 2>/dev/null || true)
-
-    if ! grep -q "EnvironmentFile=.*$DEFAULTS_FILE" <<<"$unit"; then
-        warn "The $SERVICE service does not load $DEFAULTS_FILE, the web directory setting may be ignored."
-        warn "Check it with: systemctl cat $SERVICE"
-    fi
-
-    if grep -qE 'ExecStart=.*--webdir[= ]+/' <<<"$unit"; then
-        warn "The $SERVICE service sets --webdir directly in ExecStart, which overrides $DEFAULTS_FILE."
-        warn "Change it with: sudo systemctl edit --full $SERVICE"
-    fi
+web_url() {
+    local port base
+    port=$(network_setting InternalHttpPort 8096)
+    base=$(network_setting BaseUrl "")
+    base="${base%/}"
+    [[ -z "$base" || "$base" == /* ]] || base="/$base"
+    echo "http://localhost:$port$base/web/index.html"
 }
 
 restart_server() {
-    if [[ $SKIP_RESTART -eq 1 ]]; then
-        log "Skipping restart, run: sudo systemctl restart $SERVICE"
-        return
-    fi
-
     log "Restarting $SERVICE"
+    RESTART_TIME=$(date '+%Y-%m-%d %H:%M:%S')
     as_root systemctl restart "$SERVICE"
+}
 
-    for _ in $(seq 1 30); do
-        if curl -fsS -o /dev/null "http://localhost:8096/web/index.html" 2>/dev/null; then
-            log "Jellyfin is serving the web client on port 8096"
-            return
+# Waits for the server and prints the index.html it serves
+fetch_served_index() {
+    local url="$1"
+    local _
+    for _ in $(seq 1 45); do
+        if curl -fsS "$url" 2>/dev/null; then
+            return 0
         fi
         sleep 2
     done
+    return 1
+}
 
-    systemctl is-active --quiet "$SERVICE" \
-        || die "$SERVICE did not start, check: journalctl -u $SERVICE -e"
-    warn "Jellyfin is running but did not answer on http://localhost:8096/web/ (maybe it uses another port)."
+print_diagnostics() {
+    local web_path
+    web_path=$(as_root journalctl -u "$SERVICE" --since "$RESTART_TIME" --no-pager 2>/dev/null \
+        | grep -o 'Web resources path: .*' | tail -n 1 || true)
+
+    echo >&2
+    echo "Diagnostics:" >&2
+    echo "  Server log: ${web_path:-no 'Web resources path' line found since the restart}" >&2
+    echo "  Mount:      $(systemctl show "$SERVICE" -p BindReadOnlyPaths --value 2>/dev/null || true)" >&2
+    echo "  Drop-ins:   $(systemctl show "$SERVICE" -p DropInPaths --value 2>/dev/null || true)" >&2
+    echo "  Service:    $(systemctl is-active "$SERVICE" 2>/dev/null || true)" >&2
+    echo "  Logs:       journalctl -u $SERVICE -e" >&2
+}
+
+# Checks that the running server serves the given index.html
+verify_served() {
+    local expected="$1"
+    local url served
+    url=$(web_url)
+
+    log "Checking what the server serves at $url"
+    if ! served=$(fetch_served_index "$url"); then
+        print_diagnostics
+        die "The server did not answer on $url."
+    fi
+
+    if [[ "$served" == "$(cat "$expected")" ]]; then
+        return 0
+    fi
+
+    print_diagnostics
+    die "The server is not serving the expected web client ($expected)."
 }
 
 main() {
     parse_args "$@"
+    check_user
     check_server_installed
 
+    local stock
+    stock=$(stock_web_dir)
+
     if [[ $UNINSTALL -eq 1 ]]; then
-        configure_web_dir "$STOCK_WEB_DIR"
+        restore_defaults_file "$stock"
+        unconfigure_service
+        [[ $SKIP_RESTART -eq 1 ]] && { log "Done, restart $SERVICE to apply."; return; }
         restart_server
+        verify_served "$stock/index.html"
         log "Done. The server uses the stock web client again ($INSTALL_DIR was left in place)."
         return
     fi
@@ -273,21 +431,31 @@ main() {
     log "Found jellyfin-server $version"
 
     [[ -n "$BRANCH" ]] || BRANCH=$(pick_branch "$version")
-    log "Using branch $BRANCH"
 
     install_packages
-    checkout_repo "$BRANCH"
+    find_repo
+    prepare_repo "$BRANCH"
+    check_checkout "$version"
     ensure_node
     build_web
     install_web
-    configure_web_dir "$INSTALL_DIR"
-    check_service_config
-    restart_server
+    restore_defaults_file "$stock"
+    configure_service "$stock"
 
-    log "Done. Reload Jellyfin in your browser with Ctrl+Shift+R to load the new web client."
-    log "To switch back to the stock web client run: $BUILD_DIR/install-on-server.sh --uninstall"
+    if [[ $SKIP_RESTART -eq 1 ]]; then
+        log "Done, run 'sudo systemctl restart $SERVICE' to apply."
+        return
+    fi
+
+    restart_server
+    verify_served "$INSTALL_DIR/index.html"
+
+    log "Done. The server now serves the web client built from $REPO_DIR."
+    log "Reload Jellyfin in your browser with Ctrl+Shift+R (in apps, log out and back in) to load it."
+    log "To switch back to the stock web client run: $REPO_DIR/install-on-server.sh --uninstall"
 }
 
 if [[ "${BASH_SOURCE[0]:-$0}" == "$0" ]]; then
-    main "$@"
+    # exit on the same line so bash never reads this file again after a branch switch changed it
+    main "$@"; exit $?
 fi
