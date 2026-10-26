@@ -218,7 +218,8 @@ prepare_repo() {
 
     if repo_git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' >/dev/null 2>&1; then
         log "Pulling the latest $branch"
-        repo_git pull -q --ff-only || warn "Could not fast-forward $branch, building the local version."
+        repo_git -c advice.diverging=false pull -q --ff-only 2>/dev/null \
+            || warn "Could not fast-forward $branch (it has local commits), building the local version."
     fi
 }
 
@@ -260,19 +261,24 @@ ensure_node() {
 
     export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
     if [[ ! -s "$NVM_DIR/nvm.sh" ]]; then
-        log "Installing nvm $NVM_VERSION to $NVM_DIR (Node.js $required+ is required)"
-        curl -fsSL "https://raw.githubusercontent.com/nvm-sh/nvm/$NVM_VERSION/install.sh" | PROFILE=/dev/null bash
+        log "Installing nvm $NVM_VERSION to $NVM_DIR (Node.js $required+ is required, found $(node --version 2>/dev/null || echo none))"
+        # cloned instead of using the nvm installer, which tries to edit the shell profile
+        git clone -q --depth 1 --branch "$NVM_VERSION" https://github.com/nvm-sh/nvm.git "$NVM_DIR" 2>/dev/null \
+            || die "Could not install nvm to $NVM_DIR. Install Node.js $required or newer yourself and run this script again."
     fi
 
-    # nvm.sh is not compatible with nounset
-    set +u
+    # nvm.sh returns non-zero statuses in normal operation and uses unset variables,
+    # so it must run without errexit and nounset
+    local status=0
+    set +eu
     # shellcheck source=/dev/null
-    . "$NVM_DIR/nvm.sh"
+    . "$NVM_DIR/nvm.sh" --no-use
     log "Installing Node.js $required with nvm"
-    nvm install "$required" >/dev/null
-    nvm use "$required" >/dev/null
-    set -u
+    nvm install "$required" || status=$?
+    [[ $status -eq 0 ]] && { nvm use "$required" >/dev/null || status=$?; }
+    set -eu
 
+    [[ $status -eq 0 ]] || die "nvm could not install Node.js $required (exit status $status)."
     [[ $(node_major) -ge $required ]] || die "Could not set up Node.js $required."
     log "Using Node.js $(node --version)"
 }
