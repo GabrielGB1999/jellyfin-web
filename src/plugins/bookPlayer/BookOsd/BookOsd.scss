@@ -28,6 +28,21 @@
     }
 }
 
+.bookOsdBottom {
+    display: flex;
+    flex-direction: column;
+    background-color: var(--jf-palette-AppBar-defaultBg);
+    pointer-events: auto;
+    transition: all 200ms linear;
+    transform: translateZ(0);
+}
+
+.bookOsdProgressRow {
+    height: auto;
+    min-height: 2.5em;
+    padding: 0 1.5em;
+}
+
 .bookOsdSpacer {
     flex: 1;
 }

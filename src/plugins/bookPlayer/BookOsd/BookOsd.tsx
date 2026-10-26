@@ -1,4 +1,4 @@
-import React, { type FC, useCallback, useEffect, useRef, useState } from 'react';
+import React, { type FC, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 
 import './BookOsd.scss';
 import IconButton from '../../../elements/emby-button/IconButton';
@@ -19,6 +19,10 @@ interface BookOsdProps {
     onToggleDirection?: () => void;
     onToggleLayout?: () => void;
     onToggleFullscreen: () => void;
+    /** Optional row rendered above the bottom toolbar, e.g. a page slider. */
+    progressBar?: ReactNode;
+    /** Optional player-specific controls rendered before the fullscreen button. */
+    toolbarItems?: ReactNode;
 }
 
 interface ComicsPlayerSettings {
@@ -37,7 +41,9 @@ const BookOsd: FC<BookOsdProps> = ({
     onIncreaseFontSize,
     onToggleDirection,
     onToggleLayout,
-    onToggleFullscreen
+    onToggleFullscreen,
+    progressBar,
+    toolbarItems
 }) => {
     const settings = userSettings.getComicsPlayerSettings(item.Id!) as ComicsPlayerSettings;
     const timeout = useRef<ReturnType<typeof setTimeout>>();
@@ -111,66 +117,76 @@ const BookOsd: FC<BookOsdProps> = ({
                 <span className='bookOsdTitle'>{item.Name}</span>
             </div>
 
-            <div className='bookOsdRow' style={{ paddingBottom: 'env(safe-area-inset-bottom)', ...(!visible && { opacity: 0, pointerEvents: 'none' }) }}>
-                <IconButton onClick={onPrevious} icon='navigate_before' title={globalize.translate('Previous')} />
-                <IconButton onClick={onNext} icon='navigate_next' title={globalize.translate('Next')} />
-                <div className='bookOsdSpacer' />
-
-                {onOpenTableOfContents && (
-                    <IconButton
-                        onClick={onOpenTableOfContents}
-                        icon='toc'
-                        title={globalize.translate('TableOfContents')}
-                    />
+            <div className='bookOsdBottom' style={{ paddingBottom: 'env(safe-area-inset-bottom)', ...(!visible && { opacity: 0, pointerEvents: 'none' }) }}>
+                {progressBar && (
+                    <div className='bookOsdRow bookOsdProgressRow'>
+                        {progressBar}
+                    </div>
                 )}
 
-                {onRotateTheme && (
-                    <IconButton
-                        onClick={onRotateTheme}
-                        icon='remove_red_eye'
-                        title={globalize.translate('LabelTheme')}
-                    />
-                )}
+                <div className='bookOsdRow'>
+                    <IconButton onClick={onPrevious} icon='navigate_before' title={globalize.translate('Previous')} />
+                    <IconButton onClick={onNext} icon='navigate_next' title={globalize.translate('Next')} />
+                    <div className='bookOsdSpacer' />
 
-                {onDecreaseFontSize && (
-                    <IconButton
-                        onClick={onDecreaseFontSize}
-                        icon='text_decrease'
-                        title={globalize.translate('Smaller')}
-                    />
-                )}
+                    {onOpenTableOfContents && (
+                        <IconButton
+                            onClick={onOpenTableOfContents}
+                            icon='toc'
+                            title={globalize.translate('TableOfContents')}
+                        />
+                    )}
 
-                {onIncreaseFontSize && (
-                    <IconButton
-                        onClick={onIncreaseFontSize}
-                        icon='text_increase'
-                        title={globalize.translate('Larger')}
-                    />
-                )}
+                    {onRotateTheme && (
+                        <IconButton
+                            onClick={onRotateTheme}
+                            icon='remove_red_eye'
+                            title={globalize.translate('LabelTheme')}
+                        />
+                    )}
 
-                {onToggleDirection && (
-                    <IconButton
-                        onClick={onClickDirection}
-                        icon={direction ? 'arrow_circle_left' : 'arrow_circle_right'}
-                        title={globalize.translate(direction ? 'ViewRightToLeft' : 'ViewLeftToRight')}
-                    />
-                )}
+                    {onDecreaseFontSize && (
+                        <IconButton
+                            onClick={onDecreaseFontSize}
+                            icon='text_decrease'
+                            title={globalize.translate('Smaller')}
+                        />
+                    )}
 
-                {onToggleLayout && (
-                    <IconButton
-                        onClick={onClickLayout}
-                        icon={layout ? 'import_contacts' : 'devices_fold'}
-                        title={globalize.translate(layout ? 'ViewDoublePage' : 'ViewSinglePage')}
-                    />
-                )}
+                    {onIncreaseFontSize && (
+                        <IconButton
+                            onClick={onIncreaseFontSize}
+                            icon='text_increase'
+                            title={globalize.translate('Larger')}
+                        />
+                    )}
 
-                {(Screenfull.isEnabled || window.NativeShell) && (
-                    <IconButton
-                        onClick={onClickFullscreen}
-                        icon={fullscreen ? 'fullscreen_exit' : 'fullscreen'}
-                        title={globalize.translate(fullscreen ? 'ExitFullscreen' : 'Fullscreen')}
-                    />
-                )}
+                    {onToggleDirection && (
+                        <IconButton
+                            onClick={onClickDirection}
+                            icon={direction ? 'arrow_circle_left' : 'arrow_circle_right'}
+                            title={globalize.translate(direction ? 'ViewRightToLeft' : 'ViewLeftToRight')}
+                        />
+                    )}
+
+                    {onToggleLayout && (
+                        <IconButton
+                            onClick={onClickLayout}
+                            icon={layout ? 'import_contacts' : 'devices_fold'}
+                            title={globalize.translate(layout ? 'ViewDoublePage' : 'ViewSinglePage')}
+                        />
+                    )}
+
+                    {toolbarItems}
+
+                    {(Screenfull.isEnabled || window.NativeShell) && (
+                        <IconButton
+                            onClick={onClickFullscreen}
+                            icon={fullscreen ? 'fullscreen_exit' : 'fullscreen'}
+                            title={globalize.translate(fullscreen ? 'ExitFullscreen' : 'Fullscreen')}
+                        />
+                    )}
+                </div>
             </div>
         </div>
     );
