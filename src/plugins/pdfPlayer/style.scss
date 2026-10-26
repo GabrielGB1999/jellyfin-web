@@ -2,24 +2,144 @@
     position: relative;
     height: 100%;
     width: 100%;
-    overflow: none;
+    overflow: hidden;
     z-index: 100;
-    background: #fff;
+    background: #525659;
 
-    #canvas {
-        display: block;
-        margin: auto;
-    }
-
-    .actionButtons {
-        right: 0.5vh;
-        top: 0.5vh;
-        z-index: 1002;
+    #container {
         position: absolute;
+        inset: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+        display: flex;
+        overflow: auto;
+        overscroll-behavior: contain;
+
+        &.pdfDragging {
+            cursor: grabbing;
+            user-select: none;
+        }
     }
 
-    .actionButtonIcon {
-        color: #000;
-        opacity: 0.7;
+    .pdfPages {
+        position: relative;
+        display: flex;
+        flex-shrink: 0;
+        align-items: center;
+        gap: 16px;
+        // margin auto centers the pages without clipping them when they overflow
+        margin: auto;
+        padding: 16px;
     }
+
+    .pdfPages-continuous {
+        flex-direction: column;
+    }
+
+    .pdfPage {
+        position: relative;
+        flex-shrink: 0;
+        background: #fff;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+    }
+}
+
+.pdfPageSlider {
+    flex: 1;
+    margin: 0 1em 0 0.5em;
+}
+
+.pdfPageLabel {
+    min-width: 5em;
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.pdfZoomLabel {
+    min-width: 3.5em;
+    padding: 0.4em 0.2em;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+    font-variant-numeric: tabular-nums;
+}
+
+.pdfToolbarDivider {
+    width: 1px;
+    align-self: stretch;
+    margin: 0.8em 0.4em;
+    background: currentColor;
+    opacity: 0.3;
+}
+
+.pdfViewModeActive {
+    color: var(--jf-palette-primary-main, #00a4dc);
+}
+
+@media (max-width: 40em) {
+    .pdfZoomLabel,
+    .pdfToolbarDivider {
+        display: none;
+    }
+}
+
+.pdfOsd {
+    position: absolute;
+    inset: 0;
+    z-index: 1002;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    pointer-events: none;
+    color: #fff;
+}
+
+.pdfOsdBar {
+    display: flex;
+    flex-direction: column;
+    background-color: rgba(0, 0, 0, 0.8);
+    pointer-events: auto;
+    transition: all 200ms linear;
+    // force WebKit to promote the element onto its own compositor layer for opacity on iOS
+    transform: translateZ(0);
+}
+
+.pdfOsdTop {
+    padding-top: env(safe-area-inset-top);
+}
+
+.pdfOsdBottom {
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+.pdfOsdRow {
+    display: flex;
+    align-items: center;
+    min-height: 3em;
+    padding: 0 0.8vw;
+}
+
+.pdfOsdProgressRow {
+    min-height: 2.5em;
+    padding: 0 1.5em;
+}
+
+.pdfOsdSpacer {
+    flex: 1;
+}
+
+.pdfOsdTitle {
+    font-size: 1.1rem;
+    margin-left: 0.35rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
