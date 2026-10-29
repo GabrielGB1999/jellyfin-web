@@ -1,5 +1,7 @@
 import React from 'react';
+import alert from '../../components/alert';
 import loading from '../../components/loading/loading';
+import globalize from '../../lib/globalize';
 import keyboardnavigation from '../../scripts/keyboardNavigation';
 import dialogHelper from '../../components/dialogHelper/dialogHelper';
 import TouchHelper from '../../scripts/touchHelper';
@@ -23,6 +25,13 @@ const ZOOM_MAX = 5;
 const ZOOM_STEP = 1.25;
 // Zoom factor applied per pixel of wheel delta, one mouse wheel notch (~100px) zooms ~20%
 const WHEEL_ZOOM_SPEED = Math.log(1.2) / 100;
+// Zoom level a double tap switches to when the pages fit the screen
+const DOUBLE_TAP_ZOOM = 2;
+// Max time and distance between two taps for them to count as a double tap
+const DOUBLE_TAP_DELAY = 300;
+const DOUBLE_TAP_DISTANCE = 30;
+// Max finger movement for a touch to count as a tap
+const TAP_MAX_MOVE = 10;
 
 // Gap between pages and around the page area, in CSS pixels
 const PAGE_GAP = 16;
@@ -64,6 +73,9 @@ export class PdfPlayer {
         this.onWheel = this.onWheel.bind(this);
         this.onScroll = this.onScroll.bind(this);
         this.onPointerDown = this.onPointerDown.bind(this);
+        this.onTouchStart = this.onTouchStart.bind(this);
+        this.onTouchMove = this.onTouchMove.bind(this);
+        this.onTouchEnd = this.onTouchEnd.bind(this);
         this.onResize = this.onResize.bind(this);
         this.toggleFullscreen = this.toggleFullscreen.bind(this);
     }
@@ -294,6 +306,58 @@ export class PdfPlayer {
         window.addEventListener('pointerup', onPointerUp);
     }
 
+    onTouchStart(e) {
+        if (e.touches.length === 1) {
+            // a new gesture starts, page swipes are allowed again
+            this.pinch = null;
+            this.pinched = false;
+            const touch = e.touches[0];
+            this.tapStart = { x: touch.clientX, y: touch.clientY };
+        } else if (e.touches.length === 2 && this.loaded) {
+            const [a, b] = e.touches;
+            this.pinch = {
+                distance: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1,
+                zoom: this.zoom
+            };
+            this.pinched = true;
+            this.tapStart = null;
+        }
+    }
+
+    onTouchMove(e) {
+        if (!this.pinch || e.touches.length !== 2) return;
+
+        // the viewport disables native pinch zoom, so zoom the pages instead of scrolling them
+        e.preventDefault();
+
+        const [a, b] = e.touches;
+        const distance = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+        this.setZoom(this.pinch.zoom * distance / this.pinch.distance, {
+            x: (a.clientX + b.clientX) / 2,
+            y: (a.clientY + b.clientY) / 2
+        });
+    }
+
+    onTouchEnd(e) {
+        if (e.touches.length < 2) this.pinch = null;
+        if (e.type === 'touchcancel' || e.touches.length || !this.tapStart) return;
+
+        const touch = e.changedTouches[0];
+        const start = this.tapStart;
+        this.tapStart = null;
+        if (Math.hypot(touch.clientX - start.x, touch.clientY - start.y) > TAP_MAX_MOVE) return;
+
+        const last = this.lastTap;
+        this.lastTap = { x: touch.clientX, y: touch.clientY, time: e.timeStamp };
+        if (!last
+            || e.timeStamp - last.time > DOUBLE_TAP_DELAY
+            || Math.hypot(touch.clientX - last.x, touch.clientY - last.y) > DOUBLE_TAP_DISTANCE) return;
+
+        // double tap zooms in on the tapped point, or back to fit the screen when zoomed in
+        this.lastTap = null;
+        this.setZoom(this.zoom > 1 ? 1 : DOUBLE_TAP_ZOOM, { x: touch.clientX, y: touch.clientY });
+    }
+
     onResize() {
         clearTimeout(this.resizeTimeout);
         this.resizeTimeout = setTimeout(() => {
@@ -302,8 +366,11 @@ export class PdfPlayer {
     }
 
     addSwipeGestures(element) {
-        // only flip pages when the pages fit the screen, otherwise swiping pans the zoomed page
-        const canSwipe = () => this.viewMode !== 'continuous' && this.container.scrollWidth <= this.container.clientWidth + 1;
+        // only flip pages when the pages fit the screen, otherwise swiping pans the zoomed page,
+        // and not when lifting the fingers of a pinch
+        const canSwipe = () => this.viewMode !== 'continuous'
+            && !this.pinched
+            && this.container.scrollWidth <= this.container.clientWidth + 1;
 
         this.touchHelper = new TouchHelper(element);
         Events.on(this.touchHelper, 'swiperight', () => canSwipe() && this.previous());
@@ -321,6 +388,10 @@ export class PdfPlayer {
         this.container.addEventListener('wheel', this.onWheel, { passive: false });
         this.container.addEventListener('scroll', this.onScroll, { passive: true });
         this.container.addEventListener('pointerdown', this.onPointerDown);
+        this.container.addEventListener('touchstart', this.onTouchStart, { passive: true });
+        this.container.addEventListener('touchmove', this.onTouchMove, { passive: false });
+        this.container.addEventListener('touchend', this.onTouchEnd, { passive: true });
+        this.container.addEventListener('touchcancel', this.onTouchEnd, { passive: true });
         window.addEventListener('resize', this.onResize);
     }
 
@@ -331,6 +402,12 @@ export class PdfPlayer {
         this.container?.removeEventListener('wheel', this.onWheel);
         this.container?.removeEventListener('scroll', this.onScroll);
         this.container?.removeEventListener('pointerdown', this.onPointerDown);
+        this.container?.removeEventListener('touchstart', this.onTouchStart);
+        this.container?.removeEventListener('touchmove', this.onTouchMove);
+        this.container?.removeEventListener('touchend', this.onTouchEnd);
+        this.container?.removeEventListener('touchcancel', this.onTouchEnd);
+        this.pinch = null;
+        this.lastTap = null;
         window.removeEventListener('resize', this.onResize);
         this.intersectionObserver?.disconnect();
         this.intersectionObserver = null;
@@ -406,6 +483,8 @@ export class PdfPlayer {
 
             const downloadTask = getDocument({
                 url: downloadHref,
+                // 12.x servers ignore the api_key parameter in the download URL, the header works everywhere
+                httpHeaders: { Authorization: `MediaBrowser Token="${apiClient.accessToken()}"` },
                 // Only request the byte ranges needed for the pages being viewed instead of
                 // downloading the whole document in the background, so large books open fast
                 // and seeking to any page does not wait for the pages before it
@@ -443,9 +522,15 @@ export class PdfPlayer {
             }).catch(err => {
                 if (this.cancellationToken) return;
                 console.error('[PdfPlayer] failed to load document', err);
-                loading.hide();
+                this.onLoadError();
             });
         });
+    }
+
+    /** Closes the reader and tells the user, instead of leaving an empty screen behind. */
+    onLoadError() {
+        this.stop();
+        alert(globalize.translate('MessageFileReadError'));
     }
 
     // --- navigation ---

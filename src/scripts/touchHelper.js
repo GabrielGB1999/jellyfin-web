@@ -15,6 +15,7 @@ class TouchHelper {
         let lastDeltaY;
         let thresholdYMet;
         const self = this;
+        this.elem = elem;
 
         const swipeXThreshold = options.swipeXThreshold || 50;
         const swipeYThreshold = options.swipeYThreshold || 50;
