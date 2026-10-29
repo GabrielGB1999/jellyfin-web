@@ -41,6 +41,7 @@ UNINSTALL=0
 SKIP_RESTART=0
 SKIP_UPDATE=0
 REPO_DIR=""
+REMOTE=""
 RESTART_TIME=""
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
@@ -58,6 +59,7 @@ Options:
   --branch NAME     Build this branch instead of the one matching the server version
   --no-update       Build the checkout as it is, without switching branch or pulling
   --install-dir DIR Where the built web client is installed (default: $INSTALL_DIR)
+  --build-dir DIR   Where to clone the repository when not run from a checkout (default: $CLONE_DIR)
   --no-restart      Do not restart the jellyfin service
   --uninstall       Switch back to the stock web client from the jellyfin-web package
   -h, --help        Show this help
@@ -70,6 +72,7 @@ parse_args() {
             --branch) BRANCH="${2:?--branch needs a value}"; shift 2 ;;
             --no-update) SKIP_UPDATE=1; shift ;;
             --install-dir) INSTALL_DIR="${2:?--install-dir needs a value}"; shift 2 ;;
+            --build-dir) CLONE_DIR="${2:?--build-dir needs a value}"; shift 2 ;;
             --no-restart) SKIP_RESTART=1; shift ;;
             --uninstall) UNINSTALL=1; shift ;;
             -h|--help) usage; exit 0 ;;
@@ -105,12 +108,16 @@ server_version() {
     dpkg-query -W -f='${Version}' jellyfin-server
 }
 
-# Prints "major.minor" of a version string
-major_minor() {
+# Prints the release line of a version: "10.11" for 10.x versions, the major version from 12 on
+release_line() {
     local version="$1"
     local major="${version%%.*}"
     local rest="${version#*.}"
-    echo "$major.${rest%%[.+~-]*}"
+    if [[ $major -lt 12 ]]; then
+        echo "$major.${rest%%[.+~-]*}"
+    else
+        echo "$major"
+    fi
 }
 
 # Picks the branch whose jellyfin-web version matches the server version
@@ -182,6 +189,51 @@ repo_git() {
     git -C "$REPO_DIR" "$@"
 }
 
+# Sets REMOTE to the checkout's remote for REPO_URL (https or ssh), adding one if there is none
+find_remote() {
+    local want name url
+    want=$(normalize_repo_url "$REPO_URL")
+    for name in $(repo_git remote); do
+        url=$(normalize_repo_url "$(repo_git remote get-url "$name")")
+        if [[ "$url" == "$want" ]]; then
+            REMOTE="$name"
+            return
+        fi
+    done
+
+    REMOTE="pdf-reader"
+    log "Adding remote $REMOTE for $REPO_URL"
+    repo_git remote add "$REMOTE" "$REPO_URL" \
+        || die "Could not add remote $REMOTE for $REPO_URL. If a remote with that name points elsewhere, rename or remove it."
+}
+
+# Reduces a git URL to "host/owner/repo" so https and ssh URLs compare equal
+normalize_repo_url() {
+    local url="${1%.git}"
+    url="${url#*://}"
+    url="${url#*@}"
+    url="${url/://}"
+    echo "${url,,}"
+}
+
+# Fetches the branch from REMOTE and makes the local branch track it
+track_branch() {
+    local branch="$1"
+
+    # single-branch clones (e.g. git clone --depth 1) only fetch their default branch
+    if ! repo_git config --get-all "remote.$REMOTE.fetch" | grep -qF 'refs/heads/*'; then
+        repo_git remote set-branches --add "$REMOTE" "$branch"
+    fi
+    repo_git fetch "$REMOTE" "$branch" \
+        || die "Could not fetch $branch from $(repo_git remote get-url "$REMOTE")."
+
+    if repo_git show-ref --verify --quiet "refs/heads/$branch"; then
+        repo_git branch -q --set-upstream-to="$REMOTE/$branch" "$branch"
+    else
+        repo_git branch -q --track "$branch" "$REMOTE/$branch"
+    fi
+}
+
 # Switches the checkout to the wanted branch and pulls it, never touching local changes
 prepare_repo() {
     local branch="$1"
@@ -193,33 +245,28 @@ prepare_repo() {
         return
     fi
 
-    if [[ -n "$(repo_git status --porcelain --untracked-files=no)" ]]; then
-        if [[ "$current" != "$branch" ]]; then
-            die "The checkout is on $current with uncommitted changes, but this server needs $branch. Commit or stash them, or rerun with --no-update to build $current anyway."
+    if [[ "$current" != "$branch" ]]; then
+        # untracked files count too, git refuses to switch when the branch tracks them
+        if [[ -n "$(repo_git status --porcelain)" ]]; then
+            die "The checkout is on $current with local changes or untracked files, but this server needs $branch. Commit, stash or remove them, or rerun with --no-update to build $current anyway."
         fi
+        find_remote
+        track_branch "$branch"
+        log "Switching the checkout from $current to $branch"
+        repo_git checkout -q "$branch"
+    elif [[ -n "$(repo_git status --porcelain --untracked-files=no)" ]]; then
         warn "The checkout has uncommitted changes, building them without pulling."
         return
+    else
+        find_remote
+        # e.g. clones made by the previous version of this script have no upstream
+        track_branch "$branch"
     fi
 
-    if [[ "$current" != "$branch" ]]; then
-        log "Switching the checkout from $current to $branch"
-        # single-branch clones (e.g. git clone --depth 1) only track their default branch
-        if ! repo_git config --get-all remote.origin.fetch | grep -q 'refs/heads/\*'; then
-            repo_git remote set-branches --add origin "$branch"
-        fi
-        repo_git fetch origin "$branch" \
-            || die "Could not fetch $branch from $(repo_git remote get-url origin)."
-        if repo_git show-ref --verify --quiet "refs/heads/$branch"; then
-            repo_git checkout -q "$branch"
-        else
-            repo_git checkout -q -b "$branch" --track "origin/$branch"
-        fi
-    fi
-
-    if repo_git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}' >/dev/null 2>&1; then
-        log "Pulling the latest $branch"
-        repo_git -c advice.diverging=false pull -q --ff-only 2>/dev/null \
-            || warn "Could not fast-forward $branch (it has local commits), building the local version."
+    log "Pulling the latest $branch"
+    local output
+    if ! output=$(repo_git -c advice.diverging=false pull -q --ff-only 2>&1); then
+        warn "Could not update $branch, building the local version: ${output##*$'\n'}"
     fi
 }
 
@@ -231,7 +278,7 @@ check_checkout() {
         || die "The checked out branch ($(repo_git rev-parse --abbrev-ref HEAD)) does not contain the new PDF reader."
 
     web_version=$(sed -n 's/^ *"version": *"\([^"]*\)".*/\1/p' "$REPO_DIR/package.json" | head -n 1)
-    if [[ "$(major_minor "$web_version")" != "$(major_minor "$version")" ]]; then
+    if [[ "$(release_line "$web_version")" != "$(release_line "$version")" ]]; then
         die "The checkout is jellyfin-web $web_version but the server is $version, they must match. Run without --no-update or pass the right --branch."
     fi
     log "Building jellyfin-web $web_version for jellyfin-server $version"
@@ -254,7 +301,7 @@ ensure_node() {
     local required
     required=$(required_node_major)
 
-    if [[ $(node_major) -ge $required ]]; then
+    if [[ $(node_major) -ge $required ]] && command -v npm >/dev/null; then
         log "Using Node.js $(node --version)"
         return
     fi
@@ -280,6 +327,7 @@ ensure_node() {
 
     [[ $status -eq 0 ]] || die "nvm could not install Node.js $required (exit status $status)."
     [[ $(node_major) -ge $required ]] || die "Could not set up Node.js $required."
+    command -v npm >/dev/null || die "nvm set up Node.js $required without npm."
     log "Using Node.js $(node --version)"
 }
 
@@ -308,15 +356,17 @@ restore_defaults_file() {
 
     [[ -f "$file" ]] || return 0
 
+    local line value
     for key in JELLYFIN_WEB_DIR JELLYFIN_WEB_OPT; do
-        if as_root grep -qE "^${key}=.*(${INSTALL_DIR}|${DEFAULT_INSTALL_DIR})" "$file"; then
-            log "Restoring $key in $file"
-            if [[ $key == JELLYFIN_WEB_DIR ]]; then
-                as_root sed -i -E "s|^${key}=.*|${key}=\"${stock}\"|" "$file"
-            else
-                as_root sed -i -E "s|^${key}=.*|${key}=\"--webdir=${stock}\"|" "$file"
-            fi
-        fi
+        line=$(as_root grep -m 1 "^${key}=" "$file" || true)
+        [[ -n "$line" && ( "$line" == *"$INSTALL_DIR"* || "$line" == *"$DEFAULT_INSTALL_DIR"* ) ]] || continue
+
+        log "Restoring $key in $file"
+        value="$stock"
+        [[ $key == JELLYFIN_WEB_OPT ]] && value="--webdir=$stock"
+        # escape characters that are special in a sed replacement
+        value=$(printf '%s' "$value" | sed 's/[&|\\]/\\&/g')
+        as_root sed -i "s|^${key}=.*|${key}=\"${value}\"|" "$file"
     done
 }
 
@@ -372,7 +422,7 @@ fetch_served_index() {
     local url="$1"
     local _
     for _ in $(seq 1 45); do
-        if curl -fsS "$url" 2>/dev/null; then
+        if curl -fsS --connect-timeout 5 --max-time 15 "$url" 2>/dev/null; then
             return 0
         fi
         sleep 2
@@ -402,8 +452,10 @@ verify_served() {
 
     log "Checking what the server serves at $url"
     if ! served=$(fetch_served_index "$url"); then
-        print_diagnostics
-        die "The server did not answer on $url."
+        systemctl is-active --quiet "$SERVICE" || { print_diagnostics; die "$SERVICE is not running."; }
+        warn "$SERVICE is running but did not answer on $url (it may only listen on another address or HTTPS)."
+        warn "Could not check which web client it serves, open Jellyfin to check."
+        return 0
     fi
 
     if [[ "$served" == "$(cat "$expected")" ]]; then
