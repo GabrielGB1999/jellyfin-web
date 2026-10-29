@@ -89,3 +89,10 @@
         display: none;
     }
 }
+
+// Phones do not have room for every button, pinch and double tap zoom there instead
+@media (max-width: 40em) and (pointer: coarse) {
+    .pdfZoomButton {
+        display: none;
+    }
+}

@@ -117,7 +117,7 @@ export const PdfToolbar: FC<PdfControlsProps> = ({ player }) => {
 
     return (
         <>
-            <IconButton onClick={player.zoomOut} icon='zoom_out' title={globalize.translate('ZoomOut')} />
+            <IconButton className='pdfZoomButton' onClick={player.zoomOut} icon='zoom_out' title={globalize.translate('ZoomOut')} />
             <button
                 type='button'
                 className='pdfZoomLabel'
@@ -126,7 +126,7 @@ export const PdfToolbar: FC<PdfControlsProps> = ({ player }) => {
             >
                 {Math.round(zoom * 100)}%
             </button>
-            <IconButton onClick={player.zoomIn} icon='zoom_in' title={globalize.translate('ZoomIn')} />
+            <IconButton className='pdfZoomButton' onClick={player.zoomIn} icon='zoom_in' title={globalize.translate('ZoomIn')} />
 
             <div className='pdfToolbarDivider' />
 
