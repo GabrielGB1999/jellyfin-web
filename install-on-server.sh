@@ -40,6 +40,7 @@ BRANCH=""
 UNINSTALL=0
 SKIP_RESTART=0
 SKIP_UPDATE=0
+SKIP_VERSION_CHECK=0
 REPO_DIR=""
 REMOTE=""
 RESTART_TIME=""
@@ -58,6 +59,8 @@ and makes the apt-installed Jellyfin server use it.
 Options:
   --branch NAME     Build this branch instead of the one matching the server version
   --no-update       Build the checkout as it is, without switching branch or pulling
+  --skip-version-check
+                    Build even when the web client version does not match the server version
   --install-dir DIR Where the built web client is installed (default: $INSTALL_DIR)
   --build-dir DIR   Where to clone the repository when not run from a checkout (default: $CLONE_DIR)
   --no-restart      Do not restart the jellyfin service
@@ -71,6 +74,7 @@ parse_args() {
         case "$1" in
             --branch) BRANCH="${2:?--branch needs a value}"; shift 2 ;;
             --no-update) SKIP_UPDATE=1; shift ;;
+            --skip-version-check) SKIP_VERSION_CHECK=1; shift ;;
             --install-dir) INSTALL_DIR="${2:?--install-dir needs a value}"; shift 2 ;;
             --build-dir) CLONE_DIR="${2:?--build-dir needs a value}"; shift 2 ;;
             --no-restart) SKIP_RESTART=1; shift ;;
@@ -279,7 +283,10 @@ check_checkout() {
 
     web_version=$(sed -n 's/^ *"version": *"\([^"]*\)".*/\1/p' "$REPO_DIR/package.json" | head -n 1)
     if [[ "$(release_line "$web_version")" != "$(release_line "$version")" ]]; then
-        die "The checkout is jellyfin-web $web_version but the server is $version, they must match. Run without --no-update or pass the right --branch."
+        if [[ $SKIP_VERSION_CHECK -eq 0 ]]; then
+            die "The checkout is jellyfin-web $web_version but the server is $version, they must match. Run without --no-update, pass the right --branch or pass --skip-version-check."
+        fi
+        warn "Building jellyfin-web $web_version for jellyfin-server $version, this combination is not supported and some features may not work."
     fi
     log "Building jellyfin-web $web_version for jellyfin-server $version"
 }
