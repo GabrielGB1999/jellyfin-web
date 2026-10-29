@@ -94,6 +94,7 @@ export class PdfPlayer {
         this.pageSizes = [];
         this.pageElements = new Map();
         this.canvasCache = new Map();
+        this.chapters = [];
 
         const viewMode = userSettings.get(VIEW_MODE_SETTING, false);
         this.viewMode = VIEW_MODES.includes(viewMode) ? viewMode : 'single';
@@ -173,7 +174,8 @@ export class PdfPlayer {
             page: this.page || 1,
             numPages: this.duration(),
             zoom: this.zoom || 1,
-            viewMode: this.viewMode || 'single'
+            viewMode: this.viewMode || 'single',
+            chapters: this.chapters || []
         };
     }
 
@@ -528,12 +530,55 @@ export class PdfPlayer {
 
                     this.layout();
                     this.notifyViewState();
+                    this.loadChapters(book);
                 });
             }).catch(err => {
                 if (this.cancellationToken) return;
                 console.error('[PdfPlayer] failed to load document', err);
                 this.onLoadError();
             });
+        });
+    }
+
+    /** Reads the chapters from the document outline, they show up once their pages are known. */
+    loadChapters(book) {
+        book.getOutline().then(outline => {
+            let items = outline || [];
+            // documents often wrap everything in a single root entry, its children are the chapters
+            while (items.length === 1 && items[0].items?.length) items = items[0].items;
+
+            const entries = [];
+            const flatten = (list, level) => {
+                for (const entry of list) {
+                    entries.push({ title: entry.title, dest: entry.dest, level });
+                    if (entry.items?.length) flatten(entry.items, level + 1);
+                }
+            };
+            flatten(items, 0);
+
+            return Promise.all(entries.map(entry => this.getDestinationPage(book, entry.dest).catch(() => null)))
+                .then(pages => {
+                    if (this.book !== book) return;
+
+                    this.chapters = entries
+                        .map((entry, i) => ({ title: entry.title, level: entry.level, page: pages[i] }))
+                        .filter(chapter => chapter.page);
+                    this.notifyViewState();
+                });
+        }).catch(err => {
+            console.warn('[PdfPlayer] failed to read the document outline', err);
+        });
+    }
+
+    /** Returns the page number an outline destination points to, or null for links and broken entries. */
+    getDestinationPage(book, dest) {
+        return Promise.resolve(typeof dest === 'string' ? book.getDestination(dest) : dest).then(explicit => {
+            if (!Array.isArray(explicit)) return null;
+
+            // the target is either a page object reference or a page index
+            const target = explicit[0];
+            if (Number.isInteger(target)) return target + 1;
+            return book.getPageIndex(target).then(index => index + 1);
         });
     }
 

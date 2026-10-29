@@ -48,9 +48,48 @@
     }
 }
 
-.pdfPageSlider {
+.pdfPageSliderContainer {
+    position: relative;
+    display: flex;
     flex: 1;
+    align-items: center;
+    min-width: 0;
     margin: 0 1em 0 0.5em;
+}
+
+.pdfPageSlider {
+    // above the chapter highlight
+    .MuiSlider-thumb {
+        z-index: 2;
+    }
+
+    .MuiSlider-mark {
+        width: 3px;
+        height: 10px;
+        border-radius: 1px;
+        background-color: currentColor;
+        opacity: 0.7;
+    }
+
+    .MuiSlider-valueLabelLabel {
+        display: block;
+        max-width: 60vw;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
+// Range of the chapter being read, drawn over the slider rail
+.pdfChapterHighlight {
+    position: absolute;
+    top: 50%;
+    z-index: 1;
+    height: 6px;
+    border-radius: 3px;
+    background-color: rgba(255, 255, 255, 0.6);
+    transform: translateY(-50%);
+    pointer-events: none;
 }
 
 .pdfPageLabel {
@@ -94,5 +133,9 @@
 @media (max-width: 40em) and (pointer: coarse) {
     .pdfZoomButton {
         display: none;
+    }
+
+    #pdfPlayer .paper-icon-button-light {
+        margin: 0;
     }
 }
