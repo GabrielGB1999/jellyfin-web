@@ -1266,6 +1266,12 @@ export default function (view) {
             return;
         }
 
+        // Outside TV layout Shift+arrows move focus through the OSD controls
+        if (e.shiftKey && keyboardnavigation.isNavigationKey(key)) {
+            showOsd();
+            return;
+        }
+
         if (key.startsWith('Digit') || key.startsWith('Numpad')) {
             const num = parseInt(key.replace('Digit', '').replace('Numpad', ''), 10);
             if (!isNaN(num) && num >= 0 && num <= 9) {

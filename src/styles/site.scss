@@ -101,6 +101,13 @@ div[data-role="page"] {
     outline: 0;
 }
 
+// Focus ring for keyboard navigation outside TV layout (TV has its own focus styles).
+// Skips script-only focus targets (pages, dialogs) and out-ranks the components' `outline: none !important`.
+:root:not(.layout-tv) :focus-visible:not([tabindex="-1"]) {
+    outline: 2px solid #00a4dc !important;
+    outline-offset: 2px;
+}
+
 .pageTitle {
     margin-top: 0;
     font-family: inherit;
