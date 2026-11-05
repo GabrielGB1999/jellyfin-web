@@ -48,10 +48,17 @@ const focusableTagNames = ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'];
 const focusableContainerTagNames = ['BODY', 'DIALOG'];
 const focusableQuery = focusableTagNames.map(function (t) {
     if (t === 'INPUT') {
-        t += ':not([type="range"]):not([type="file"])';
+        t += ':not([type="file"])';
     }
     return t + ':not([tabindex="-1"]):not(:disabled)';
-}).join(',') + ',.focusable';
+}).join(',') + ',.focusable,[tabindex="0"]';
+
+// TV layout only reaches sliders that opt in with the focusable class, other layouts reach every slider
+function isSkippedRange(elem) {
+    return elem.type === 'range'
+        && !elem.classList.contains('focusable')
+        && document.documentElement.classList.contains('layout-tv');
+}
 
 function isFocusable(elem) {
     return focusableTagNames.indexOf(elem.tagName) !== -1
@@ -104,7 +111,7 @@ function isCurrentlyFocusable(elem) {
 
         if (elem.tagName === 'INPUT') {
             const type = elem.type;
-            if (type === 'range') {
+            if (isSkippedRange(elem)) {
                 return false;
             }
             if (type === 'file') {
@@ -127,7 +134,7 @@ function getFocusableElements(parent, limit, excludeClass) {
     for (let i = 0, length = elems.length; i < length; i++) {
         const elem = elems[i];
 
-        if (excludeClass && elem.classList.contains(excludeClass)) {
+        if ((excludeClass && elem.classList.contains(excludeClass)) || isSkippedRange(elem)) {
             continue;
         }
 
@@ -270,7 +277,7 @@ function nav(activeElement, direction, container, focusableElements) {
             continue;
         }
         // Don't refocus into the same container
-        if (curr === focusableContainer) {
+        if (curr === focusableContainer || isSkippedRange(curr)) {
             continue;
         }
 

@@ -5,6 +5,7 @@ import { PluginType } from 'constants/pluginType';
 
 import loading from '../../components/loading/loading';
 import keyboardnavigation from '../../scripts/keyboardNavigation';
+import layoutManager from '../../components/layoutManager';
 import dialogHelper from '../../components/dialogHelper/dialogHelper';
 import TouchHelper from '../../scripts/touchHelper';
 import { appRouter } from '../../components/router/appRouter';
@@ -37,6 +38,15 @@ const MAX_CANVAS_PIXELS = 4096 * 4096;
 // Number of pages rendered ahead of time in single page and spread modes
 const PREFETCH_PAGES = 2;
 const CANVAS_CACHE_SIZE = 8;
+// Fraction of the screen scrolled per arrow key press
+const PAN_STEP = 0.1;
+const PAN_DIRECTIONS = {
+    ArrowLeft: [-1, 0],
+    ArrowRight: [1, 0],
+    ArrowUp: [0, -1],
+    ArrowDown: [0, 1]
+};
+
 // Total canvas pixels kept in the cache, high zoom levels keep fewer pages around
 const CANVAS_CACHE_PIXELS = 32 * 1024 * 1024;
 const RERENDER_DELAY = 150;
@@ -170,10 +180,29 @@ export class PdfPlayer {
     }
 
     onWindowKeyDown(e) {
-        if (!this.loaded) return;
+        if (!this.loaded || e.metaKey) return;
 
-        // Skip modified keys
-        if (e.ctrlKey || e.altKey || e.metaKey) return;
+        // Shift+arrows are left to keyboardNavigation, which moves focus through the reader controls
+        const key = keyboardnavigation.getKeyName(e);
+        const pan = PAN_DIRECTIONS[key];
+
+        if (e.ctrlKey || e.altKey) {
+            if (!pan || e.shiftKey || (e.ctrlKey && e.altKey)) return;
+
+            e.preventDefault();
+            if (e.altKey) {
+                // Alt+arrows pan the page
+                this.pan(...pan);
+            } else if (key === 'ArrowUp') {
+                // Ctrl+up/down zoom, Ctrl+left/right jump to the first/last page
+                this.zoomIn();
+            } else if (key === 'ArrowDown') {
+                this.zoomOut();
+            } else {
+                this.seek(key === 'ArrowLeft' ? 1 : this.duration());
+            }
+            return;
+        }
 
         switch (e.key) {
             case '+':
@@ -193,9 +222,15 @@ export class PdfPlayer {
 
         if (e.shiftKey) return;
 
-        const key = keyboardnavigation.getKeyName(e);
-
         switch (key) {
+            case 'ArrowUp':
+            case 'ArrowDown':
+                // TV remotes have no Shift, there up/down keep moving focus to the reader controls
+                if (!layoutManager.tv) {
+                    e.preventDefault();
+                    this.pan(...pan);
+                }
+                break;
             case 'KeyL':
             case 'ArrowRight':
             case 'Right':
@@ -570,6 +605,14 @@ export class PdfPlayer {
 
     getPageOffset(wrapper) {
         return this.pagesElem.offsetTop + wrapper.offsetTop;
+    }
+
+    /** Scrolls the pages by a tenth of the screen in the given direction. */
+    pan(x, y) {
+        this.container.scrollBy({
+            left: x * this.container.clientWidth * PAN_STEP,
+            top: y * this.container.clientHeight * PAN_STEP
+        });
     }
 
     // --- zoom ---

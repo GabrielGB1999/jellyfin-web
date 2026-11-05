@@ -98,15 +98,25 @@ const BookOsd: FC<BookOsdProps> = ({
             setVisible(state => !state);
         };
 
+        // show the controls while keyboard focus moves through them
+        const onFocusIn = (event: FocusEvent) => {
+            if (!(event.target as Element | null)?.closest?.('.bookOsd')) return;
+
+            scheduleHide();
+            setVisible(true);
+        };
+
         scheduleHide();
         document.addEventListener('pointermove', onPointerMove);
         document.addEventListener('click', onClick);
+        document.addEventListener('focusin', onFocusIn);
 
         return () => {
             clearTimeout(timeout.current);
             updateFullscreen(false);
             document.removeEventListener('pointermove', onPointerMove);
             document.removeEventListener('click', onClick);
+            document.removeEventListener('focusin', onFocusIn);
         };
     }, [scheduleHide, updateFullscreen]);
 
