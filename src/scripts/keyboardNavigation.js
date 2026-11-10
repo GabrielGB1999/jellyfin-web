@@ -101,6 +101,11 @@ const InteractiveElements = ['INPUT', 'TEXTAREA'];
 const NonInteractiveInputElements = ['button', 'checkbox', 'color', 'file', 'hidden', 'image', 'radio', 'reset', 'submit'];
 
 /**
+ * Types of INPUT element that edit text, where arrow keys move the caret.
+ */
+const TextInputElements = ['text', 'search', 'email', 'password', 'url', 'tel'];
+
+/**
  * Returns key name from event.
  *
  * @param {KeyboardEvent} event - Keyboard event.
@@ -149,20 +154,67 @@ export function isInteractiveElement(element) {
     return false;
 }
 
+/**
+ * Returns _true_ if the element uses the arrow key itself, outside TV layout.
+ * Text fields keep left/right and Shift+arrows (selection), single-line ones give up/down to navigation.
+ * Other fields (select, number, range, ...) keep plain arrows, Shift+arrows navigate away from them.
+ *
+ * @param {Element} element - Focused element.
+ * @param {string} command - Navigation command (left, right, up or down).
+ * @param {boolean} shiftKey - _true_ if Shift is held.
+ * @return {boolean} _true_ if the element keeps the key.
+ */
+export function keepsArrowKey(element, command, shiftKey) {
+    if (!element) return false;
+
+    if (element.tagName === 'TEXTAREA' || element.isContentEditable) return true;
+
+    if (element.tagName === 'INPUT' && TextInputElements.includes(element.type)) {
+        return shiftKey || command === 'left' || command === 'right';
+    }
+
+    return !shiftKey && (element.tagName === 'SELECT' || isInteractiveElement(element));
+}
+
+/**
+ * Moves focus in the given direction.
+ *
+ * @param {string} command - Navigation command (left, right, up or down).
+ * @param {boolean} shiftKey - _true_ if Shift is held.
+ * @return {boolean} _true_ if the key was used.
+ */
+function navigate(command, shiftKey) {
+    const element = document.activeElement;
+
+    if (layoutManager.tv) {
+        if ((command === 'left' || command === 'right') && isInteractiveElement(element)) return false;
+
+        inputManager.handleCommand(command);
+        return true;
+    }
+
+    if (keepsArrowKey(element, command, shiftKey)) return false;
+
+    inputManager.handleCommand(command);
+    // let the browser scroll the page when there was nothing to move focus to
+    return document.activeElement !== element;
+}
+
 export function enable() {
     const hasMediaSession = 'mediaSession' in navigator;
     window.addEventListener('keydown', function (e) {
         if (e.defaultPrevented) return;
 
         // Skip modified keys
-        if (e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+        if (e.ctrlKey || e.altKey || e.metaKey) return;
 
         const key = getKeyName(e);
 
-        // Ignore navigation keys for non-TV
-        if (!layoutManager.tv && isNavigationKey(key)) {
-            return;
-        }
+        // Outside TV layout Shift+arrows also navigate, so players and readers can keep plain arrows for themselves
+        if (e.shiftKey && (layoutManager.tv || !isNavigationKey(key))) return;
+
+        // Leave browser shortcuts alone outside TV layout
+        if (!layoutManager.tv && (key === 'BrowserHome' || key === 'Find')) return;
 
         // Ignore Media Keys for non-TV platform having MediaSession API
         if (!browser.tv && isMediaKey(key) && hasMediaSession) {
@@ -173,24 +225,16 @@ export function enable() {
 
         switch (key) {
             case 'ArrowLeft':
-                if (!isInteractiveElement(document.activeElement)) {
-                    inputManager.handleCommand('left');
-                } else {
-                    capture = false;
-                }
+                capture = navigate('left', e.shiftKey);
                 break;
             case 'ArrowUp':
-                inputManager.handleCommand('up');
+                capture = navigate('up', e.shiftKey);
                 break;
             case 'ArrowRight':
-                if (!isInteractiveElement(document.activeElement)) {
-                    inputManager.handleCommand('right');
-                } else {
-                    capture = false;
-                }
+                capture = navigate('right', e.shiftKey);
                 break;
             case 'ArrowDown':
-                inputManager.handleCommand('down');
+                capture = navigate('down', e.shiftKey);
                 break;
 
             case 'GamepadA':
@@ -282,5 +326,6 @@ export default {
     enable: enable,
     getKeyName: getKeyName,
     isNavigationKey,
+    keepsArrowKey,
     canEnableGamepad
 };
