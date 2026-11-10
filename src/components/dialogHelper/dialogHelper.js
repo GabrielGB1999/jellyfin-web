@@ -257,6 +257,12 @@ export function open(dlg) {
     });
 }
 
+/** Returns _true_ if no other dialog is open on top of the dialog. */
+export function isTopDialog(dlg) {
+    const dialogs = document.querySelectorAll('.dialogContainer .dialog.opened');
+    return dialogs[dialogs.length - 1] === dlg;
+}
+
 function isOpened(dlg) {
     return !dlg.classList.contains('hide');
 }
@@ -519,5 +525,6 @@ export default {
     open: open,
     close: close,
     createDialog: createDialog,
+    isTopDialog,
     setOnOpen: setOnOpen
 };

@@ -195,6 +195,8 @@ export class PdfPlayer {
 
     onWindowKeyDown(e) {
         if (!this.loaded || e.metaKey) return;
+        // dialogs opened over the reader, like the chapter list, handle their own keys
+        if (!dialogHelper.isTopDialog(this.mediaElement)) return;
 
         // Shift+arrows are left to keyboardNavigation, which moves focus through the reader controls
         const key = keyboardnavigation.getKeyName(e);
