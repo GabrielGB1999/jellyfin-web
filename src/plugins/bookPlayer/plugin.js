@@ -146,6 +146,8 @@ export class BookPlayer {
         const key = keyboardnavigation.getKeyName(e);
 
         if (!this.loaded) return;
+        // dialogs opened over the reader, like the table of contents, handle their own keys
+        if (!dialogHelper.isTopDialog(this.mediaElement)) return;
         switch (key) {
             case 'KeyL':
             case 'ArrowRight':

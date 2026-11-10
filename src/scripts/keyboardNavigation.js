@@ -326,6 +326,5 @@ export default {
     enable: enable,
     getKeyName: getKeyName,
     isNavigationKey,
-    keepsArrowKey,
     canEnableGamepad
 };
