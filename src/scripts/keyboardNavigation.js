@@ -159,7 +159,7 @@ export function isInteractiveElement(element) {
  * Text fields keep left/right and Shift+arrows (selection), single-line ones give up/down to navigation.
  * Other fields (select, number, range, ...) keep plain arrows, Shift+arrows navigate away from them.
  *
- * @param {Element} element - Focused element.
+ * @param {Element|null} element - Focused element.
  * @param {string} command - Navigation command (left, right, up or down).
  * @param {boolean} shiftKey - _true_ if Shift is held.
  * @return {boolean} _true_ if the element keeps the key.
