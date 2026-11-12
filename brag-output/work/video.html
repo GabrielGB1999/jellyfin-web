@@ -1,0 +1,463 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face{font-family:'Material Icons';src:url(MaterialIcons-Regular.woff2) format('woff2');}
+@font-face{font-family:'Noto Sans';font-weight:400;src:url(ns400.woff2)}
+@font-face{font-family:'Noto Sans';font-weight:600;src:url(ns600.woff2)}
+@font-face{font-family:'Noto Sans';font-weight:700;src:url(ns700.woff2)}
+@font-face{font-family:'Noto Sans';font-weight:800;src:url(ns800.woff2)}
+:root{--bg:#101010;--paper:#202020;--primary:#00a4dc;--purple:#aa5cc3;--text2:rgba(255,255,255,.7);--reader:#525659}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1280px;height:720px;overflow:hidden;background:var(--bg);color:#fff;font-family:'Noto Sans',sans-serif}
+.layer{position:absolute;inset:0;overflow:hidden}
+.mi{font-family:'Material Icons';font-weight:normal;font-style:normal;font-size:22px;line-height:1;letter-spacing:normal;text-transform:none;display:inline-block;white-space:nowrap;font-feature-settings:'liga';-webkit-font-smoothing:antialiased}
+
+/* library */
+.appbar{position:absolute;left:0;right:0;top:0;height:56px;background:var(--paper);display:flex;align-items:center;padding:0 18px;gap:14px;font-size:19px;font-weight:600}
+.appbar img{width:30px;height:30px}
+.appbar .sp{flex:1}
+.appbar .mi{font-size:26px;opacity:.85}
+#headline{position:absolute;left:0;right:0;top:104px;text-align:center;font-size:50px;font-weight:800;line-height:1.12;letter-spacing:-.5px}
+#headline em{font-style:normal;background:linear-gradient(90deg,var(--purple),var(--primary));-webkit-background-clip:text;color:transparent}
+#section{position:absolute;left:70px;top:262px;font-size:22px;font-weight:600}
+#section .mi{vertical-align:-4px;font-size:24px}
+.grid{position:absolute;left:70px;top:304px;display:flex;gap:24px}
+.card{width:170px}
+.cover{width:170px;height:240px;border-radius:6px;position:relative;overflow:hidden;box-shadow:0 6px 18px rgba(0,0,0,.5);padding:14px 14px;display:flex;flex-direction:column}
+.cover .kick{font-size:9px;letter-spacing:2px;font-weight:700;opacity:.8}
+.cover .ttl{font-size:21px;font-weight:800;line-height:1.08;margin-top:8px}
+.cover .ico{position:absolute;right:-18px;bottom:-22px;font-size:128px;opacity:.28}
+.cover .ed{position:absolute;left:14px;bottom:12px;font-size:10px;font-weight:600;opacity:.85}
+.cover .rule{width:34px;height:3px;background:currentColor;margin-top:10px;opacity:.7}
+.card .name{font-size:14px;margin-top:9px;text-align:center;font-weight:600}
+.card .sub{font-size:12px;text-align:center;color:var(--text2)}
+
+/* reveal / outro */
+.center{position:absolute;left:0;right:0;text-align:center}
+.glow{position:absolute;inset:0;background:radial-gradient(600px 300px at 40% 45%,rgba(170,92,195,.18),transparent 70%),radial-gradient(600px 300px at 60% 55%,rgba(0,164,220,.16),transparent 70%)}
+.tag{font-size:40px;font-weight:700}
+.small{font-size:20px;color:var(--text2);font-weight:600}
+
+/* reader */
+#caption{position:absolute;left:56px;top:0;bottom:0;width:360px}
+.cap{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%)}
+.cap .eye{font-size:14px;letter-spacing:3px;font-weight:700;color:var(--primary)}
+.cap .h{font-size:42px;font-weight:800;line-height:1.1;margin-top:12px;letter-spacing:-.4px}
+.cap .s{font-size:20px;color:var(--text2);margin-top:16px;font-weight:600;line-height:1.35}
+#win{position:absolute;left:440px;top:40px;width:816px;height:640px;border-radius:14px;overflow:hidden;background:var(--reader);box-shadow:0 24px 70px rgba(0,0,0,.7),0 0 0 1px rgba(255,255,255,.08);transform-origin:0 0}
+.osdTop{position:absolute;left:0;right:0;top:0;height:36px;background:var(--paper);display:flex;align-items:center;padding:0 7px;z-index:2}
+.osdTop .t{font-size:15px;font-weight:600;margin-left:6px}
+.btn{width:36px;height:36px;display:flex;align-items:center;justify-content:center;color:#fff;position:relative}
+.btn.active{color:var(--primary)}
+#area{position:absolute;left:0;right:0;top:36px;bottom:82px;overflow:hidden}
+#pages{position:absolute;inset:0}
+.osdBottom{position:absolute;left:0;right:0;bottom:0;height:82px;background:var(--paper);z-index:2}
+.prow{height:46px;display:flex;align-items:center;padding:0 22px 0 26px}
+.slider{flex:1;position:relative;height:30px;margin:0 16px 0 8px}
+.rail{position:absolute;left:0;right:0;top:13px;height:4px;border-radius:2px;background:rgba(0,164,220,.38)}
+.track{position:absolute;left:0;top:13px;height:4px;border-radius:2px;background:var(--primary)}
+.thumb{position:absolute;top:8px;width:14px;height:14px;margin-left:-7px;border-radius:50%;background:var(--primary)}
+.halo{position:absolute;top:1px;width:28px;height:28px;margin-left:-14px;border-radius:50%;background:rgba(0,164,220,.16)}
+.bubble{position:absolute;top:-30px;transform:translateX(-50%);background:#757575;color:#fff;font-size:12px;font-weight:600;padding:4px 8px;border-radius:4px;white-space:nowrap}
+.plabel{min-width:72px;text-align:right;font-size:14px;font-variant-numeric:tabular-nums}
+.brow{height:36px;display:flex;align-items:center;padding:0 7px}
+.brow .sp{flex:1}
+.zl{min-width:50px;text-align:center;font-size:14px;font-variant-numeric:tabular-nums}
+.div{width:1px;height:20px;background:#fff;opacity:.3;margin:0 6px}
+
+/* manual page (base 600x849) */
+.pg{position:absolute;width:600px;height:849px;background:#fff;color:#1b1f24;box-shadow:0 2px 8px rgba(0,0,0,.5);transform-origin:0 0;font-family:'DejaVu Serif',serif;padding:44px 52px;overflow:hidden}
+.pg .hd{display:flex;justify-content:space-between;font-family:'Noto Sans';font-size:9px;letter-spacing:1.6px;font-weight:700;color:#4a5560;border-bottom:1.5px solid #1d4f91;padding-bottom:6px}
+.pg h2{font-family:'Noto Sans';font-size:21px;font-weight:800;color:#1d4f91;margin:20px 0 10px}
+.pg p{font-size:11.2px;line-height:1.6;margin-bottom:9px;text-align:justify}
+.pg .fig{margin:12px 0 6px;border:1px solid #c9d2dc;border-radius:3px;background:#f6f9fc}
+.pg .fc{font-family:'Noto Sans';font-size:9.5px;font-weight:600;color:#4a5560;margin-bottom:12px}
+.pg .ft{position:absolute;left:52px;right:52px;bottom:26px;display:flex;justify-content:space-between;font-family:'Noto Sans';font-size:9px;color:#6a7580}
+.pg table{width:100%;border-collapse:collapse;font-family:'Noto Sans';font-size:10.5px;margin:6px 0 12px}
+.pg td{border-bottom:1px solid #d8dee5;padding:6px 4px}
+.pg td:last-child{text-align:right;font-weight:700}
+.pg .note{border-left:3px solid #d08a00;background:#fff7e6;padding:8px 10px;font-size:10.5px;line-height:1.5;margin:8px 0 12px;font-family:'Noto Sans'}
+.cv{background:linear-gradient(160deg,#0f2a4d,#1d4f91);color:#fff;padding:70px 60px}
+
+/* network */
+.node{position:absolute;transform:translate(-50%,-50%);text-align:center}
+.circ{width:84px;height:84px;border-radius:50%;background:var(--paper);display:flex;align-items:center;justify-content:center;margin:0 auto;box-shadow:0 0 0 1px rgba(255,255,255,.1)}
+.circ .mi{font-size:42px}
+.nl{font-size:19px;font-weight:700;margin-top:10px}
+.ns{font-size:14px;color:var(--text2);font-weight:600}
+.dev{position:absolute;display:flex;align-items:center;gap:14px;transform:translateY(-50%)}
+.dev .circ{width:60px;height:60px}
+.dev .circ .mi{font-size:30px}
+.dev span.l{font-size:17px;font-weight:600}
+.server{width:250px;padding:22px 18px;border-radius:16px;background:var(--paper);box-shadow:0 0 0 1.5px rgba(0,164,220,.6),0 0 50px rgba(0,164,220,.25)}
+.server img{width:58px;height:58px}
+.pkt{position:absolute;transform:translate(-50%,-50%);font-size:28px;color:#e8574a}
+
+#dip{position:absolute;inset:0;background:var(--bg);pointer-events:none}
+#cursor{position:absolute;left:0;top:0;width:26px;height:26px;pointer-events:none;filter:drop-shadow(0 2px 3px rgba(0,0,0,.6))}
+#ripple{position:absolute;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;border:2.5px solid #fff;pointer-events:none}
+</style></head>
+<body>
+
+<!-- 1 + 3: library -->
+<div id="lib" class="layer">
+  <div class="appbar"><span class="mi">menu</span><img src="icon-transparent.png"><span>Flight School Library</span><span class="sp"></span><span class="mi">search</span><span class="mi">account_circle</span></div>
+  <div id="headline">Every training manual.<br><em>One shelf.</em></div>
+  <div id="section">Manuals <span class="mi">chevron_right</span></div>
+  <div class="grid" id="grid"></div>
+</div>
+
+<!-- 2: reveal -->
+<div id="reveal" class="layer"><div class="glow"></div>
+  <img id="rvBanner" src="banner-light.png" style="position:absolute;left:50%;top:230px;width:540px;transform-origin:50% 50%">
+  <div id="rvTag" class="center tag" style="top:430px">Now with a built-in PDF reader.</div>
+</div>
+
+<!-- 3-5: reader -->
+<div id="rd" class="layer">
+  <div id="caption">
+    <div class="cap" id="cap0"><div class="eye">PDF READER</div><div class="h">Jump to any page.</div><div class="s">Even in a 248-page manual.</div></div>
+    <div class="cap" id="cap1"><div class="eye">ZOOM</div><div class="h">Zoom into every schematic.</div><div class="s">Up to 500%.</div></div>
+    <div class="cap" id="cap2"><div class="eye">VIEW MODES</div><div class="h">Single, spread or continuous.</div><div class="s">Your choice is remembered.</div></div>
+  </div>
+  <div id="win">
+    <div class="osdTop"><div class="btn"><span class="mi">arrow_back</span></div><span class="t">Aircraft Systems</span></div>
+    <div id="area"><div id="pages"></div></div>
+    <div class="osdBottom">
+      <div class="prow">
+        <div class="btn" style="display:none"></div>
+        <div class="slider" id="slider"><div class="rail"></div><div class="track" id="track"></div><div class="halo" id="halo"></div><div class="thumb" id="thumb"></div><div class="bubble" id="bubble"></div></div>
+        <span class="plabel" id="plabel">1 / 248</span>
+      </div>
+      <div class="brow">
+        <div class="btn"><span class="mi">navigate_before</span></div><div class="btn"><span class="mi">navigate_next</span></div>
+        <span class="sp"></span>
+        <div class="btn"><span class="mi">zoom_out</span></div><span class="zl" id="zl">100%</span><div class="btn" id="bZoomIn"><span class="mi">zoom_in</span></div>
+        <span class="div"></span>
+        <div class="btn" id="mSingle"><span class="mi">crop_portrait</span></div><div class="btn" id="mSpread"><span class="mi">import_contacts</span></div><div class="btn" id="mCont"><span class="mi">view_day</span></div>
+        <div class="btn"><span class="mi">fullscreen</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 6: network -->
+<div id="net" class="layer">
+  <div id="netH" class="center" style="top:56px;font-size:48px;font-weight:800;letter-spacing:-.5px">On your school's <em style="font-style:normal;background:linear-gradient(90deg,var(--purple),var(--primary));-webkit-background-clip:text;color:transparent">own server.</em></div>
+  <svg id="lines" width="1280" height="720" style="position:absolute;inset:0"></svg>
+  <div class="node" id="nTeach" style="left:200px;top:410px"><div class="circ"><span class="mi">person</span></div><div class="nl">Teachers</div><div class="ns">add manuals</div></div>
+  <div class="node" id="nServer" style="left:600px;top:410px"><div class="server"><img src="icon-transparent.png"><div class="nl">Local server</div><div class="ns">Manual library</div></div></div>
+  <div id="devs"></div>
+  <div id="devLabel" class="node" style="left:1060px;top:196px"><div class="nl">Students</div></div>
+  <div id="pkts"></div>
+</div>
+
+<!-- 7: outro -->
+<div id="outro" class="layer"><div class="glow"></div>
+  <img id="oBanner" src="banner-light.png" style="position:absolute;left:50%;top:210px;width:500px;transform-origin:50% 50%">
+  <div id="oTag" class="center tag" style="top:395px">Your manuals, on your network.</div>
+  <div id="oSub" class="center small" style="top:462px">Free &amp; open source&nbsp; · &nbsp;jellyfin.org</div>
+</div>
+
+<div id="dip"></div>
+<div id="ripple"></div>
+<svg id="cursor" viewBox="0 0 26 26"><path d="M3 2 L3 21 L8 16.5 L11.5 24 L14.8 22.6 L11.4 15.2 L18 15.2 Z" fill="#fff" stroke="#111" stroke-width="1.4" stroke-linejoin="round"/></svg>
+
+<script>
+// ---------- helpers ----------
+const $ = id => document.getElementById(id);
+const clamp = (v, a, b) => Math.min(Math.max(v, a), b);
+const seg = (t, a, b) => clamp((t - a) / (b - a), 0, 1);
+const eo = x => 1 - Math.pow(1 - x, 3);
+const eio = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const back = x => { const c = 1.6; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+const lerp = (a, b, x) => a + (b - a) * x;
+const show = (el, o) => { el.style.opacity = o; el.style.visibility = o > 0.001 ? 'visible' : 'hidden'; };
+
+// ---------- library covers (fictional placeholder manuals) ----------
+const MANUALS = [
+  ['Aircraft Systems', 'settings', '#1d4f91', '#eaf2ff', '248 pages'],
+  ['Principles of Flight', 'flight', '#0b6e6e', '#e6fffb', '196 pages'],
+  ['Air Navigation', 'explore', '#5b3a8c', '#f3ecff', '312 pages'],
+  ['Meteorology', 'cloud', '#2c5f8a', '#eef6ff', '224 pages'],
+  ['Powerplant', 'local_gas_station', '#8a3b1d', '#fff1ea', '180 pages'],
+  ['Air Law', 'gavel', '#3a3f47', '#f1f3f5', '156 pages']
+];
+$('grid').innerHTML = MANUALS.map(([t, ico, bg, fg, pages], i) => `
+  <div class="card" id="card${i}"><div class="cover" style="background:linear-gradient(155deg,${bg},${bg}cc 60%,#0a0f18);color:${fg}">
+    <div class="kick">STUDENT TRAINING MANUAL</div><div class="ttl">${t}</div><div class="rule"></div>
+    <span class="mi ico">${ico}</span><div class="ed">PDF · Edition 3</div></div>
+    <div class="name">${t}</div><div class="sub">${pages}</div></div>`).join('');
+
+// ---------- manual pages (illustrative content) ----------
+const FIG = `<svg viewBox="0 0 494 230" width="494" height="230" font-family="Noto Sans" font-size="10" font-weight="600">
+  <defs><marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#1d4f91"/></marker>
+  <marker id="ag" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" fill="#8a96a3"/></marker></defs>
+  <rect x="20" y="24" width="86" height="58" rx="4" fill="#dfe8f3" stroke="#1d4f91" stroke-width="1.5"/><rect x="21" y="52" width="84" height="29" fill="#9cc0e6"/>
+  <text x="63" y="16" text-anchor="middle" fill="#1b1f24">RESERVOIR</text>
+  <path d="M63 82 V120" stroke="#8a96a3" stroke-width="3" fill="none"/>
+  <circle cx="63" cy="146" r="24" fill="#fff" stroke="#1d4f91" stroke-width="1.5"/><path d="M50 146 L63 133 L76 146 L63 159Z" fill="#1d4f91"/>
+  <text x="63" y="192" text-anchor="middle" fill="#1b1f24">ENGINE PUMP</text>
+  <path d="M87 146 H180" stroke="#1d4f91" stroke-width="3.5" fill="none" marker-end="url(#ar)"/>
+  <rect x="118" y="160" width="40" height="22" rx="3" fill="#fff" stroke="#d08a00" stroke-width="1.5"/><text x="138" y="175" text-anchor="middle" fill="#d08a00" font-size="9">RELIEF</text>
+  <path d="M138 160 V146" stroke="#d08a00" stroke-width="1.5"/>
+  <rect x="184" y="112" width="96" height="70" rx="4" fill="#fff" stroke="#1d4f91" stroke-width="1.5"/>
+  <path d="M200 130 H264 M200 164 H264 M232 130 V164" stroke="#1d4f91" stroke-width="1.5"/>
+  <text x="232" y="200" text-anchor="middle" fill="#1b1f24">SELECTOR VALVE</text>
+  <text x="232" y="104" text-anchor="middle" fill="#1d4f91" font-size="9">GEAR UP ▲</text>
+  <path d="M280 128 H350 V70 H372" stroke="#1d4f91" stroke-width="3.5" fill="none" marker-end="url(#ar)"/>
+  <path d="M372 110 H330 V166 H280" stroke="#8a96a3" stroke-width="3" fill="none" marker-end="url(#ag)"/>
+  <rect x="376" y="52" width="100" height="74" rx="6" fill="#eef3f9" stroke="#1d4f91" stroke-width="1.5"/>
+  <rect x="380" y="56" width="44" height="66" fill="#9cc0e6"/><rect x="424" y="56" width="8" height="66" fill="#1d4f91"/>
+  <path d="M432 89 H490" stroke="#1d4f91" stroke-width="5"/>
+  <text x="426" y="146" text-anchor="middle" fill="#1b1f24">GEAR ACTUATOR</text>
+  <path d="M232 182 V214 H63 V170" stroke="#8a96a3" stroke-width="2" fill="none" stroke-dasharray="5 4"/>
+  <text x="150" y="226" text-anchor="middle" fill="#8a96a3" font-size="9">RETURN TO RESERVOIR</text>
+  <g font-size="9" fill="#4a5560"><rect x="350" y="176" width="16" height="4" fill="#1d4f91"/><text x="372" y="181">Pressure</text>
+  <rect x="350" y="192" width="16" height="4" fill="#8a96a3"/><text x="372" y="197">Return</text></g>
+</svg>`;
+const hd = (r) => `<div class="hd"><span>AIRCRAFT SYSTEMS · STUDENT TRAINING MANUAL</span><span>${r}</span></div>`;
+const ft = (n) => `<div class="ft"><span>For training use only</span><span>${n}</span></div>`;
+const PAGES = {
+  1: `<div class="pg cv"><div style="font-family:'Noto Sans';font-size:12px;letter-spacing:4px;font-weight:700;opacity:.8">STUDENT TRAINING MANUAL</div>
+      <div style="font-family:'Noto Sans';font-size:58px;font-weight:800;line-height:1.02;margin-top:24px">Aircraft<br>Systems</div>
+      <div style="width:70px;height:4px;background:#7fc6ff;margin:28px 0"></div>
+      <div style="font-family:'Noto Sans';font-size:15px;opacity:.85;line-height:1.6">Hydraulics · Landing Gear · Electrical<br>Fuel · Flight Controls · Instruments</div>
+      <span class="mi" style="position:absolute;right:-40px;bottom:120px;font-size:340px;opacity:.12">settings</span>
+      <div style="position:absolute;left:60px;bottom:56px;font-family:'Noto Sans';font-size:12px;opacity:.7">Edition 3 · Fixed-wing</div></div>`,
+  142: `<div class="pg">${hd('CHAPTER 7 · HYDRAULIC SYSTEMS')}<h2>7.3 Landing Gear Retraction</h2>
+      <p>Most retractable gear systems use a hydraulic circuit powered by an engine-driven or electric pump. Fluid is stored in a reservoir and delivered to the system under pressure whenever the pump is running.</p>
+      <p>When the pilot moves the gear selector to UP, the selector valve directs pressurised fluid to the retract side of each actuator, while fluid from the extend side returns to the reservoir.</p>
+      <div class="fig">${FIG}</div><div class="fc">Fig. 7-3 &nbsp;Simplified hydraulic gear retraction circuit</div>
+      <p>A pressure relief valve protects the circuit from overpressure. Once each leg is fully retracted, mechanical uplocks hold it in place and the gear position indicators extinguish.</p>
+      <p>Always confirm the gear position indication after each selection. Refer to the aircraft flight manual for type-specific limits.</p>${ft(142)}</div>`,
+  143: `<div class="pg">${hd('CHAPTER 7 · HYDRAULIC SYSTEMS')}<h2>7.4 Emergency Extension</h2>
+      <p>If hydraulic pressure is lost, the gear can still be lowered using an alternate system. Depending on the aircraft this may be a hand pump, a stored-pressure bottle, or free-fall under gravity.</p>
+      <div class="note"><b>CAUTION</b> — Emergency extension is usually one-way. Once used, the gear may not retract again until the system has been serviced.</div>
+      <p>Typical checklist, gear unsafe indication:</p>
+      <table><tr><td>1. Gear selector</td><td>DOWN</td></tr><tr><td>2. Circuit breakers</td><td>CHECK</td></tr><tr><td>3. Hydraulic pressure</td><td>CHECK</td></tr><tr><td>4. Emergency extension</td><td>AS PER AFM</td></tr><tr><td>5. Gear indication</td><td>3 GREEN</td></tr></table>
+      <p>Practise the emergency procedure in the simulator before your first flight in a retractable-gear aircraft, and review it again during each recurrent check.</p>
+      <p>Students should be able to explain how the alternate system works, where its controls are located, and what indications confirm a safe extension.</p>${ft(143)}</div>`,
+  144: `<div class="pg">${hd('CHAPTER 7 · HYDRAULIC SYSTEMS')}<h2>7.5 Wheel Brakes</h2>
+      <p>Light aircraft usually have independent hydraulic brakes on each main wheel, operated by toe pedals on the rudder pedals. Each pedal drives a master cylinder that pressurises its own brake line.</p>
+      <p>Differential braking lets the pilot steer at low speed during taxi. Heavy or prolonged braking heats the discs and can reduce their effectiveness.</p>
+      <p>Before flight, check the brake lines and discs for leaks, wear and corrosion, and test the brakes as soon as the aircraft starts moving.</p>${ft(144)}</div>`
+};
+
+// ---------- network ----------
+const DEVS = [['laptop', 'Laptop', 960, 270], ['tablet_mac', 'Tablet', 990, 370], ['smartphone', 'Phone', 990, 470], ['tv', 'Classroom TV', 960, 570]];
+$('devs').innerHTML = DEVS.map(([ic, l, x, y], i) => `<div class="dev" id="dev${i}" style="left:${x}px;top:${y}px"><div class="circ"><span class="mi">${ic}</span></div><span class="l">${l}</span></div>`).join('');
+const LINES = [[242, 410, 475, 410]].concat(DEVS.map(([, , x, y]) => [725, 410, x - 4, y]));
+$('lines').innerHTML = LINES.map((l, i) => `<line id="ln${i}" x1="${l[0]}" y1="${l[1]}" x2="${l[2]}" y2="${l[3]}" stroke="rgba(0,164,220,.55)" stroke-width="2.5" stroke-linecap="round"/>`).join('');
+$('pkts').innerHTML = LINES.map((_, i) => `<span class="mi pkt" id="pk${i}">picture_as_pdf</span>`).join('');
+
+// ---------- reader layout ----------
+const AREA_W = 816, AREA_H = 640 - 36 - 82, PW = 600, PH = 849, GAP = 16;
+let pagesKey = '';
+function setPages(list) {
+  const key = list.join(',');
+  if (key === pagesKey) return;
+  pagesKey = key;
+  $('pages').innerHTML = list.map(n => PAGES[n].replace('class="pg', `data-n="${n}" class="pg`)).join('');
+}
+function layoutReader(mode, page, zoom, scroll) {
+  const els = [...$('pages').children];
+  if (mode === 'continuous') {
+    const s = Math.min(AREA_W - 2 * GAP, 1000) / PW;
+    els.forEach((el, i) => { el.style.transform = `translate(${GAP}px,${GAP + i * (PH * s + GAP) - scroll}px) scale(${s})`; });
+    return;
+  }
+  const n = els.length;
+  const fit = Math.min((AREA_H - 2 * GAP) / PH, (AREA_W - 2 * GAP - (n - 1) * GAP) / (n * PW));
+  const s = fit * zoom, w = PW * s, h = PH * s;
+  const total = n * w + (n - 1) * GAP;
+  els.forEach((el, i) => {
+    el.style.transform = `translate(${AREA_W / 2 - total / 2 + i * (w + GAP)}px,${AREA_H / 2 - h / 2}px) scale(${s})`;
+  });
+}
+
+// ---------- cursor ----------
+const rectOf = id => { const r = $(id).getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
+function cursorPath(t, keys) {
+  // keys: [time, [x,y]] — eased moves between consecutive keyframes
+  if (t <= keys[0][0]) return keys[0][1];
+  for (let i = 1; i < keys.length; i++) {
+    if (t <= keys[i][0]) {
+      const x = eio(seg(t, keys[i - 1][0], keys[i][0]));
+      return [lerp(keys[i - 1][1][0], keys[i][1][0], x), lerp(keys[i - 1][1][1], keys[i][1][1], x)];
+    }
+  }
+  return keys[keys.length - 1][1];
+}
+
+// ---------- timeline (120 BPM: beat = 0.5s) ----------
+const T = { reveal: 3, reader: 5, zoom: 9, modes: 12, net: 14.5, outro: 18, end: 21 };
+const DIPS = [3, 5, 14.5, 18];
+const ZOOM_CLICKS = [9.5, 10, 10.5];
+const RESET_CLICK = 11.5, SPREAD_CLICK = 12.5, CONT_CLICK = 13.5;
+
+function render(t) {
+  // dips through the background between scenes
+  let dip = 0;
+  for (const d of DIPS) dip = Math.max(dip, 1 - Math.abs(t - d) / 0.18);
+  $('dip').style.opacity = clamp(dip, 0, 1);
+
+  const inLib = t < T.reveal || (t >= T.reader && t < 6.1);
+  show($('lib'), inLib ? 1 : 0);
+  show($('reveal'), t >= T.reveal && t < T.reader ? 1 : 0);
+  show($('rd'), t >= 5.45 && t < T.net ? 1 : 0);
+  show($('net'), t >= T.net && t < T.outro ? 1 : 0);
+  show($('outro'), t >= T.outro ? 1 : 0);
+
+  // --- scene 1: hook ---
+  if (inLib) {
+    const h = t < T.reveal ? eo(seg(t, 0.05, 0.45)) : 0;
+    $('headline').style.opacity = h;
+    $('headline').style.transform = `translateY(${(1 - h) * 24}px)`;
+    $('section').style.opacity = t < T.reveal ? eo(seg(t, 0.3, 0.6)) : 1;
+    MANUALS.forEach((_, i) => {
+      const p = t < T.reveal ? seg(t, 0.5 + i * 0.25, 0.5 + i * 0.25 + 0.4) : 1;
+      const c = $('card' + i);
+      c.style.opacity = clamp(p * 2, 0, 1);
+      c.style.transform = `translateY(${(1 - eo(p)) * 40}px) scale(${0.85 + 0.15 * back(p)})`;
+    });
+    // scene 3 intro: library recedes as the reader opens
+    const o = t >= T.reader ? eo(seg(t, 5.5, 6.0)) : 0;
+    $('lib').style.transform = `scale(${1 + o * 0.05})`;
+    $('lib').style.filter = o ? `brightness(${1 - o * 0.6})` : '';
+    $('lib').style.opacity = 1 - seg(t, 5.85, 6.1);
+  }
+
+  // --- scene 2: reveal ---
+  if (t >= T.reveal && t < T.reader) {
+    const b = seg(t, 3.08, 3.5);
+    $('rvBanner').style.opacity = eo(b);
+    $('rvBanner').style.transform = `translateX(-50%) scale(${0.88 + 0.12 * eo(b)})`;
+    const g = eo(seg(t, 3.35, 3.7));
+    $('rvTag').style.opacity = g;
+    $('rvTag').style.transform = `translateY(${(1 - g) * 18}px)`;
+  }
+
+  // --- scenes 3-5: reader ---
+  if (t >= 5.45 && t < T.net) {
+    const open = eo(seg(t, 5.5, 6.0));
+    const [cx, cy] = [70 + 85, 304 + 120]; // card 0 centre
+    const s = lerp(0.24, 1, open);
+    $('win').style.opacity = clamp(open * 1.6, 0, 1);
+    $('win').style.transform = `translate(${lerp(cx - 440 - 408 * s, 0, open)}px,${lerp(cy - 40 - 320 * s, 0, open)}px) scale(${s})`;
+
+    // captions: old out, then new in
+    const caps = [[6.0, 9.0], [9.0, 12.0], [12.0, 14.6]];
+    caps.forEach(([a, b], i) => {
+      const inn = eo(seg(t, a + 0.1, a + 0.4)), out = seg(t, b - 0.12, b);
+      const el = $('cap' + i);
+      el.style.opacity = inn * (1 - out);
+      el.style.transform = `translateY(calc(-50% + ${(1 - inn) * 22 - out * 14}px))`;
+    });
+
+    // slider drag 1 -> 142, page renders on release (like the real slider)
+    const drag = eio(seg(t, 6.6, 7.5));
+    const val = Math.round(lerp(1, 142, drag));
+    const page = t < 7.5 ? 1 : 142;
+    const shownVal = t < 6.6 ? 1 : val;
+    const railW = $('slider').clientWidth;
+    const px = (shownVal - 1) / 247 * railW;
+    $('track').style.width = px + 'px';
+    $('thumb').style.left = $('halo').style.left = $('bubble').style.left = px + 'px';
+    const dragging = t > 6.45 && t < 7.6;
+    $('halo').style.opacity = dragging ? 1 : 0;
+    $('bubble').style.opacity = dragging ? 1 : 0;
+    $('bubble').textContent = `Page ${shownVal} of 248`;
+    $('plabel').textContent = `${shownVal} / 248`;
+
+    // zoom
+    const steps = ZOOM_CLICKS.filter(c => t >= c).length;
+    let zoom = 1, target = 1;
+    if (t < RESET_CLICK) {
+      target = Math.pow(1.25, steps);
+      const last = ZOOM_CLICKS[steps - 1];
+      zoom = steps ? lerp(Math.pow(1.25, steps - 1), target, eo(seg(t, last, last + 0.22))) : 1;
+    } else {
+      zoom = lerp(Math.pow(1.25, 3), 1, eo(seg(t, RESET_CLICK, RESET_CLICK + 0.25)));
+    }
+    $('zl').textContent = Math.round(target * 100) + '%';
+
+    // view modes
+    const mode = t < SPREAD_CLICK ? 'single' : t < CONT_CLICK ? 'spread' : 'continuous';
+    $('mSingle').classList.toggle('active', mode === 'single');
+    $('mSpread').classList.toggle('active', mode === 'spread');
+    $('mCont').classList.toggle('active', mode === 'continuous');
+    setPages(mode === 'single' ? [page] : mode === 'spread' ? [142, 143] : [142, 143, 144]);
+    const scroll = mode === 'continuous' ? eio(seg(t, 13.7, 14.5)) * 900 : 0;
+    layoutReader(mode, page, zoom, scroll);
+    // brief fade while the page re-renders (page change and mode switches)
+    let fade = 1;
+    for (const c of [7.5, SPREAD_CLICK, CONT_CLICK]) if (t >= c && t < c + 0.18) fade = eo(seg(t, c, c + 0.18));
+    $('pages').style.opacity = fade;
+  }
+
+  // --- cursor ---
+  let cur = null, clickAt = null;
+  if (t >= T.reader && t < 6.0) {
+    cur = cursorPath(t, [[5.0, [900, 640]], [5.4, [150, 400]]]);
+    clickAt = 5.5;
+  } else if (t >= 6.0 && t < T.net - 0.1) {
+    const thumb0 = rectOf('slider'); const sl = $('slider').getBoundingClientRect();
+    const thumbX = sl.left + parseFloat($('thumb').style.left || 0), thumbY = sl.top + 15;
+    const zi = rectOf('bZoomIn'), zl = rectOf('zl'), sp = rectOf('mSpread'), co = rectOf('mCont');
+    const off = ([x, y]) => [x - 3, y - 2];
+    const keys = [[6.0, [700, 520]], [6.4, [sl.left, thumbY]]];
+    if (t >= 6.4 && t < 7.6) cur = [thumbX - 3, thumbY - 2];
+    else cur = cursorPath(t, [...keys, [7.6, [thumbX - 3, thumbY - 2]], [9.35, off(zi)], [11.0, off(zi)], [11.4, off(zl)], [12.0, off(zl)], [12.4, off(sp)], [13.0, off(sp)], [13.4, off(co)]]);
+    if (t < 6.4) cur = cursorPath(t, keys);
+    clickAt = [...ZOOM_CLICKS, RESET_CLICK, SPREAD_CLICK, CONT_CLICK].filter(c => t >= c).pop() ?? null;
+  }
+  show($('cursor'), cur ? 1 : 0);
+  if (cur) {
+    const pressed = clickAt !== null && t - clickAt < 0.1;
+    $('cursor').style.transform = `translate(${cur[0]}px,${cur[1]}px) scale(${pressed ? 0.85 : 1})`;
+    const r = clickAt !== null ? seg(t, clickAt, clickAt + 0.35) : 1;
+    $('ripple').style.left = (cur[0] + 3) + 'px';
+    $('ripple').style.top = (cur[1] + 2) + 'px';
+    $('ripple').style.opacity = r < 1 ? (1 - r) * 0.8 : 0;
+    $('ripple').style.transform = `scale(${0.4 + r})`;
+  } else $('ripple').style.opacity = 0;
+
+  // --- scene 6: network ---
+  if (t >= T.net && t < T.outro) {
+    const h = eo(seg(t, 14.65, 15.0));
+    $('netH').style.opacity = h;
+    $('netH').style.transform = `translateY(${(1 - h) * 20}px)`;
+    const pop = (id, a) => { const p = seg(t, a, a + 0.35); $(id).style.opacity = clamp(p * 2, 0, 1); $(id).style.scale = 0.7 + 0.3 * back(p); };
+    pop('nTeach', 15.0); pop('nServer', 15.25);
+    DEVS.forEach((_, i) => pop('dev' + i, 15.75 + i * 0.25));
+    const lb = eo(seg(t, 15.75, 16.1)); $('devLabel').style.opacity = lb;
+    LINES.forEach((l, i) => {
+      const a = i === 0 ? 15.25 : 15.75 + (i - 1) * 0.25;
+      const d = eo(seg(t, a, a + 0.4)), len = Math.hypot(l[2] - l[0], l[3] - l[1]);
+      const ln = $('ln' + i); ln.setAttribute('stroke-dasharray', len); ln.setAttribute('stroke-dashoffset', len * (1 - d));
+      // PDFs travel teacher -> server -> devices, once per bar (2s), staggered by a beat
+      const start = i === 0 ? 15.5 : 16.0 + (i - 1) * 0.25;
+      const ph = t >= start ? ((t - start) % 2) / 1.0 : 2;
+      const pk = $('pk' + i);
+      if (ph <= 1) {
+        const x = eio(ph);
+        pk.style.left = lerp(l[0], l[2], x) + 'px'; pk.style.top = lerp(l[1], l[3], x) + 'px';
+        pk.style.opacity = Math.min(1, ph * 5, (1 - ph) * 5);
+      } else pk.style.opacity = 0;
+    });
+  }
+
+  // --- scene 7: outro ---
+  if (t >= T.outro) {
+    const b = seg(t, 18.08, 18.5);
+    $('oBanner').style.opacity = eo(b);
+    $('oBanner').style.transform = `translateX(-50%) scale(${0.9 + 0.1 * eo(b)})`;
+    const g = eo(seg(t, 18.4, 18.75)); $('oTag').style.opacity = g; $('oTag').style.transform = `translateY(${(1 - g) * 18}px)`;
+    const s = eo(seg(t, 18.7, 19.05)); $('oSub').style.opacity = s;
+  }
+}
+window.render = render;
+render(0);
+</script>
+</body></html>

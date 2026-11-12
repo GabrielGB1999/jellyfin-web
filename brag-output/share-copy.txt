@@ -1,0 +1,1 @@
+Jellyfin now reads PDFs. Put your flight school's training manuals on your own local server, and teachers and students can open them on any laptop, tablet or classroom TV, jump to page 142 in one drag, and zoom right into the hydraulic schematic.
