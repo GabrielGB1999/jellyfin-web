@@ -1,6 +1,6 @@
 # 120 BPM synth score for the brag video; every event sits on the 16th-note grid.
 import numpy as np, wave, sys
-SR, BPM, DUR = 44100, 120, 21.0
+SR, BPM, DUR = 44100, 120, 34.0
 B = 60 / BPM
 N = int(SR * DUR)
 L = np.zeros(N); R = np.zeros(N)
@@ -65,21 +65,21 @@ bars = int(np.ceil(DUR / (4 * B)))
 for b in range(bars):
     t0 = b * 4 * B; ch = CH[b % 4]
     d = min(4 * B + .4, DUR - t0)
-    add(pad([c + 12 for c in ch], d), t0, .055 if t0 < 18 else .07)
+    add(pad([c + 12 for c in ch], d), t0, .055 if t0 < 30 else .07)
 
 for k in range(int(DUR / (B / 2))):  # 8th-note grid
     t = k * B / 2; beat = k // 2; off = k % 2; bar = int(t // (4 * B))
-    in_body = 1.0 <= t < 18.5
-    breath = 3.0 <= t < 5.0
+    in_body = 1.0 <= t < 30.5
+    breath = 4.0 <= t < 7.0
     # kick: four on the floor, half-time in the reveal, stops at the outro
     if not off and in_body and (not breath or beat % 2 == 0):
         add(kick(), t, .55)
-    if off and 1.0 <= t < 18 and not breath:
+    if off and 1.0 <= t < 30 and not breath:
         add(hat(), t, .10, .3)
-    if not off and beat % 2 == 1 and 5.0 <= t < 18:
+    if not off and beat % 2 == 1 and 7.0 <= t < 30:
         add(clap(), t, .12, -.15)
     # bass: 8th-note pluck on the root, octave jump on the last 8th of each beat pair
-    if 1.0 <= t < 18.5 and not (breath and off):
+    if 1.0 <= t < 30.5 and not (breath and off):
         r = ROOT[bar % 4] - 12 + (12 if k % 4 == 3 else 0)
         add(pluck(r + 12, .18, 900), t, .30)
 
@@ -87,23 +87,23 @@ for k in range(int(DUR / (B / 2))):  # 8th-note grid
 MOT = [0, 1, 2, 1]
 for k in range(int(DUR / (B / 2))):
     t = k * B / 2
-    if t < 3.0 or t >= 18.0:
+    if t < 4.0 or t >= 30.0:
         ch = CH[int(t // (4 * B)) % 4]
-        add(bell(ch[MOT[k % 4]] + 24, .35), t, .07 if t < 20 else .07 * (1 - (t - 20)), .25 * (-1) ** k)
+        add(bell(ch[MOT[k % 4]] + 24, .35), t, .07 if t < 32 else .07 * max(0, 1 - (t - 32) / 2), .25 * (-1) ** k)
 
 # sfx, in key and on the grid
 for i in range(6):  # cover pops, ascending A minor pentatonic
-    add(pluck([69, 72, 74, 76, 79, 81][i], .12, 4000), .5 + i * .25, .09, -.4 + .16 * i)
-for c in (3.0, 5.0, 14.5, 18.0):
+    add(pluck([69, 72, 74, 76, 79, 81][i], .12, 4000), .75 + i * .375, .09, -.4 + .16 * i)
+for c in (4.0, 7.0, 23.0, 30.0):
     whoosh(c)
-for c, m in ((5.5, 76), (9.5, 76), (10.0, 79), (10.5, 81), (11.5, 72), (12.5, 76), (13.5, 79)):  # UI clicks
+for c, m in ((7.5, 76), (14.0, 76), (14.5, 79), (15.0, 81), (17.0, 72), (19.0, 76), (20.5, 79)):  # UI clicks
     add(bell(m + 12, .05), c, .05, .2)
 # slider drag: rising soft tone 6.5 -> 7.5
-n = int(SR * 1.0); t = np.arange(n) / SR
-add(np.sin(2 * np.pi * np.cumsum(440 + 440 * (t / 1.0)) / SR) * np.sin(np.pi * t / 1.0) ** 2, 6.5, .025)
-add(bell(81 + 12, .1), 7.5, .06)  # release
-for i in range(5):  # network: soft blips as PDFs arrive
-    add(bell([76, 79, 81, 84, 88][i], .1), 16.0 + i * .25 + .5, .03, .5)
+n = int(SR * 1.5); t = np.arange(n) / SR
+add(np.sin(2 * np.pi * np.cumsum(440 + 440 * (t / 1.5)) / SR) * np.sin(np.pi * t / 1.5) ** 2, 9.0, .025)
+add(bell(81 + 12, .1), 10.5, .06)  # release
+for i in range(4):  # shortcut rows: soft key taps as each row lands
+    add(bell([76, 79, 81, 84][i] + 12, .06), 23.5 + i * .5 + .25, .045, .3)
 
 mix = np.stack([L, R], 1)
 fade = np.ones(N); fl = int(.9 * SR); fade[-fl:] = np.linspace(1, 0, fl) ** 1.5

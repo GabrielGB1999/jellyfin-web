@@ -1,1 +1,1 @@
-Jellyfin now reads PDFs. Put your flight school's training manuals on your own local server, and teachers and students can open them on any laptop, tablet or classroom TV, jump to page 142 in one drag, and zoom right into the hydraulic schematic.
+Jellyfin ahora tiene lector de PDF. Abre el manual de mantenimiento del tren de aterrizaje, salta a la página 142 de un tirón, amplía el diagrama hidráulico y elige vista simple, doble o continua, con teclado, pantalla táctil o el control remoto de la TV.
