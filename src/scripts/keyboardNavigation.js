@@ -106,6 +106,12 @@ const NonInteractiveInputElements = ['button', 'checkbox', 'color', 'file', 'hid
 const TextInputElements = ['text', 'search', 'email', 'password', 'url', 'tel'];
 
 /**
+ * Composite widgets (menus, tabs, radio groups, ...) that move focus with arrow keys themselves.
+ */
+const ArrowKeyWidgets = ['menu', 'menubar', 'listbox', 'tablist', 'radiogroup', 'grid', 'treegrid', 'tree', 'slider', 'spinbutton', 'combobox']
+    .map(role => `[role="${role}"]`).join(',');
+
+/**
  * Returns key name from event.
  *
  * @param {KeyboardEvent} event - Keyboard event.
@@ -169,11 +175,14 @@ export function keepsArrowKey(element, command, shiftKey) {
 
     if (element.tagName === 'TEXTAREA' || element.isContentEditable) return true;
 
+    if (!shiftKey && element.closest?.(ArrowKeyWidgets)) return true;
+
     if (element.tagName === 'INPUT' && TextInputElements.includes(element.type)) {
         return shiftKey || command === 'left' || command === 'right';
     }
 
-    return !shiftKey && (element.tagName === 'SELECT' || isInteractiveElement(element));
+    // radio buttons are skipped by isInteractiveElement, but arrows pick the next one in their group
+    return !shiftKey && (element.tagName === 'SELECT' || element.type === 'radio' || isInteractiveElement(element));
 }
 
 /**
@@ -193,7 +202,8 @@ function navigate(command, shiftKey) {
         return true;
     }
 
-    if (keepsArrowKey(element, command, shiftKey)) return false;
+    // with nothing focused (e.g. after clicking blank space) arrows scroll the page instead of jumping to its first control
+    if (!element || element === document.body || keepsArrowKey(element, command, shiftKey)) return false;
 
     inputManager.handleCommand(command);
     // let the browser scroll the page when there was nothing to move focus to
