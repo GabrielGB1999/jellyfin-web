@@ -32,6 +32,18 @@ describe('keepsArrowKey', () => {
         }
     });
 
+    it('lets radio groups and ARIA widgets handle plain arrows', () => {
+        const tab = document.createElement('button');
+        const tablist = document.createElement('div');
+        tablist.setAttribute('role', 'tablist');
+        tablist.append(tab);
+
+        for (const elem of [input('radio'), tab]) {
+            expect(keepsArrowKey(elem, 'right', false)).toBe(true);
+            expect(keepsArrowKey(elem, 'right', true)).toBe(false);
+        }
+    });
+
     it('never keeps arrows on buttons and links', () => {
         expect(keepsArrowKey(document.createElement('button'), 'left', false)).toBe(false);
         expect(keepsArrowKey(input('checkbox'), 'down', false)).toBe(false);
@@ -72,6 +84,12 @@ describe('arrow key handling', () => {
     it('lets the browser scroll when focus does not move', () => {
         expect(press('ArrowDown', 40)).toBe(false);
         expect(mocks.handleCommand).toHaveBeenCalledWith('down');
+    });
+
+    it('scrolls the page when nothing is focused', () => {
+        first.blur();
+        expect(press('ArrowDown', 40)).toBe(false);
+        expect(mocks.handleCommand).not.toHaveBeenCalled();
     });
 
     it('navigates with Shift+arrows outside TV layout only', () => {
